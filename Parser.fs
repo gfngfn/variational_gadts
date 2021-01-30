@@ -4,17 +4,7 @@ open FParsec
 open FParsec.Primitives
 open FParsec.CharParsers
 
-type Range = (Position * Position) option
-
-type Ident =
-  | Ident of Range * string
-
-type Ast = Range * AstMain
-
-and AstMain =
-  | Var    of Ident
-  | Apply  of Ast * Ast
-  | Lambda of Ident * Ast
+open Syntax
 
 let makeRange ((r1, _) : Ast) ((r2, _) : Ast) : Range =
   match (r1, r2) with
