@@ -3,19 +3,21 @@ module Main
 open System
 open FSharp.Core
 
-type ResultBuilder() =
-  member this.Bind(f, x) = Result.bind x f
-  member this.Return(v) = Result.Ok(v)
+open MyUtil
 
-let result = new ResultBuilder()
+type ProgramError =
+  | ParseError of Parser.ParseError
+  | TypeError  of TypeChecker.TypeError
 
 [<EntryPoint>]
 let main argv =
   let input = "fun x -> fun y -> z (y x)"
+  let tyenv = Map.empty
   let res =
     result {
-      let! e = Parser.parse input
+      let! e = Parser.parse input |> Result.mapError (fun x -> ParseError(x))
       printfn "Hello world %O" e
+      let! ty = TypeChecker.typecheck tyenv e |> Result.mapError (fun x -> TypeError(x))
       return ()
     }
   match res with
