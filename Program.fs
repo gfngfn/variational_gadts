@@ -4,6 +4,6 @@ open System
 
 [<EntryPoint>]
 let main argv =
-    let message = Lib.from "3.14" // Call the function
-    printfn "Hello world %s" message
-    0 // return an integer exit code
+  let message = Parser.from "fun x -> fun y -> y x" // Call the function
+  printfn "Hello world %s" message
+  0 // return an integer exit code
