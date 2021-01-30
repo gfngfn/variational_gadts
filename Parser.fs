@@ -1,5 +1,6 @@
 module Parser
 
+open FSharp.Core
 open FParsec
 open FParsec.Primitives
 open FParsec.CharParsers
@@ -46,7 +47,7 @@ and bottomLevelParser s =
   let p2 = between (pstring "(" .>> spaces) (pstring ")") absLevelParser
   ((p1 <|> p2) .>> spaces) s
 
-let from s =
+let parse (s : string) : Result<Ast, string> =
   match run absLevelParser s with
-  | Success(res, _, _) -> sprintf "success: %O" res
-  | Failure(msg, _, _) -> sprintf "failure: %s" msg
+  | Success(e, _, _)   -> Result.Ok(e)
+  | Failure(msg, _, _) -> Result.Error(msg)
