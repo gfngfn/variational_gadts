@@ -8,15 +8,15 @@ open Syntax
 
 let makeRange ((r1, _) : Ast) ((r2, _) : Ast) : Range =
   match (r1, r2) with
-  | (Some(posL, _), Some(_, posR)) -> Some(posL, posR)
-  | _                              -> None
+  | (ValidRange(posL, _), ValidRange(_, posR)) -> ValidRange(posL, posR)
+  | _                                          -> DummyRange
 
 let identifierParser s =
   let pMain =
     let isIdentifierFirstChar c = isLetter c
     let isIdentifierChar c = isLetter c || isDigit c || c = '_'
     many1Satisfy2L isIdentifierFirstChar isIdentifierChar "identifier"
-  let p = pipe3 getPosition pMain getPosition (fun posL x posR -> Ident(Some(posL, posR), x))
+  let p = pipe3 getPosition pMain getPosition (fun posL x posR -> Ident(ValidRange(posL, posR), x))
   p s
 
 let rec absLevelParser s =
@@ -28,14 +28,14 @@ and abstractionParser s =
     let pIdentAndArrow : Parser<Ident, 'u> = identifierParser .>> spaces .>> pstring "->" .>> spaces
     pFun .>>. pIdentAndArrow
   let p2f (posL, ident) : Parser<Ast, 'u> =
-    absLevelParser .>>. getPosition >>= fun (e, posR) -> preturn (Some(posL, posR), Lambda(ident, e))
+    absLevelParser .>>. getPosition >>= fun (e, posR) -> preturn (ValidRange(posL, posR), Lambda(ident, e))
   (p1 >>= p2f) s
 
 and appLevelParser s =
   let p =
     many1 bottomLevelParser >>= function
     | []      -> failwith "bug"
-    | e :: es -> preturn (List.foldBack (fun ef ex -> (makeRange ef ex, Apply(ef, ex))) es e)
+    | e :: es -> preturn (List.fold (fun ef ex -> (makeRange ef ex, Apply(ef, ex))) e es)
   in
   p s
 
@@ -46,5 +46,5 @@ and bottomLevelParser s =
 
 let from s =
   match run absLevelParser s with
-  | Success(res, _, _) -> sprintf "success: %A" res
+  | Success(res, _, _) -> sprintf "success: %O" res
   | Failure(msg, _, _) -> sprintf "failure: %s" msg
