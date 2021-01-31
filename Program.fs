@@ -11,7 +11,7 @@ type ProgramError =
 
 [<EntryPoint>]
 let main argv =
-  let input = "fun x -> fun y -> y x"
+  let input = "let apply = fun x -> fun y -> x y in apply"
   let tyenv = Map.empty
   let res =
     result {

@@ -99,3 +99,11 @@ let rec typecheck (tyenv : TypeEnv) (e : Ast) : Result<MonoType, TypeError> =
         let! () = unify ty1 (DummyRange, FuncType(ty2, tyR))
         return tyR
       }
+
+  | LetIn(Ident(rngx, x), e1, e2) ->
+      result {
+        let! ty1 = typecheck tyenv e1
+        let pty1 = generalize tyenv ty1
+        let! ty2 = typecheck (tyenv.Add(x, pty1)) e2
+        return ty2
+      }

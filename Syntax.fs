@@ -33,12 +33,14 @@ and AstMain =
   | Var    of Ident
   | Apply  of Ast * Ast
   | Lambda of Ident * Ast
+  | LetIn  of Ident * Ast * Ast
 
   override this.ToString () =
     match this with
     | Var(Ident(_, x)) -> sprintf "Var(\"%s\")" x
     | Apply(e1, e2)    -> sprintf "Apply(%O, %O)" e1 e2
     | Lambda(ident, e) -> sprintf "Lambda(%O, %O)" ident e
+    | LetIn(i, e1, e2) -> sprintf "LetIn(%O, %O, %O)" i e1 e2
 
 type FreeId private(n : int) =
 

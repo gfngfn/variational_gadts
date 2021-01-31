@@ -24,13 +24,27 @@ let identifierParser s =
   let pMain =
     let isIdentifierFirstChar c = isLetter c
     let isIdentifierChar c = isLetter c || isDigit c || c = '_'
-    many1Satisfy2L isIdentifierFirstChar isIdentifierChar "identifier"
+    many1Satisfy2L isIdentifierFirstChar isIdentifierChar "identifier" >>= begin function
+    | "fun" | "let" | "in" -> fail "reserved word"
+    | x                    -> preturn x
+    end
   let p = withRange pMain |>> (fun (r, x) -> Ident(r, x))
   p s
 
 
 let rec absLevelParser s =
-  (abstractionParser <|> appLevelParser) s
+  (letParser <|> abstractionParser <|> appLevelParser) s
+
+
+and letParser s =
+  let p1 : Parser<Ident, 'u> =
+    pstring "let" .>> spaces >>. identifierParser .>> spaces .>> pstring "=" .>> spaces
+  let p2f (ident : Ident) : Parser<AstMain, 'u> =
+    let p21 = absLevelParser .>> pstring "in" .>> spaces
+    let p22 = absLevelParser
+    pipe2 p21 p22 (fun e1 e2 -> LetIn(ident, e1, e2))
+  let p = withRange (p1 >>= p2f)
+  p s
 
 
 and abstractionParser s =
