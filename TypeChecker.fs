@@ -10,16 +10,79 @@ type TypeEnv =
 
 type TypeError =
   | UnboundVariable of Range
+  | Inclusion       of FreeId * MonoType * MonoType
+  | Contradiction   of MonoType * MonoType
+
+type UnificationError =
+  | InternalInclusion     of FreeId
+  | InternalContradiction
 
 
 let freshMonoType (rng : Range) : MonoType =
-  let fid = fresh ()
+  let fid = new FreeId()
   let tvuref = ref (Free(fid))
   (rng, TypeVar(Updatable(tvuref)))
 
 
+let rec occurs (fid0 : FreeId) ((_, tyMain) : MonoType) : bool =
+  let aux = occurs fid0
+  match tyMain with
+  | TypeVar(Updatable(tvuref)) ->
+      match !tvuref with
+      | Free(fid) -> fid = fid0
+      | Link(ty)  -> aux ty
+
+  | BaseType(_) ->
+      false
+
+  | FuncType(ty1, ty2) ->
+      let b1 = aux ty1
+      let b2 = aux ty2
+      b1 || b2
+
+
 let unify (ty1 : MonoType) (ty2 : MonoType) : Result<unit, TypeError> =
-  failwith "TODO: unify"
+  let rec aux (ty1 : MonoType) (ty2 : MonoType) : Result<unit, UnificationError> =
+    let (rng1, tyMain1) = ty1
+    let (rng2, tyMain2) = ty2
+    match (tyMain1, tyMain2) with
+    | (TypeVar(Updatable{contents = Link(ty1sub)}), _) ->
+        aux ty1sub ty2
+
+    | (_, TypeVar(Updatable{contents = Link(ty2sub)})) ->
+        aux ty1 ty2sub
+
+    | (TypeVar(Updatable({contents = Free(fid1)} as tvuref1)), _) ->
+        if occurs fid1 ty2 then
+          Error(InternalInclusion(fid1))
+        else
+          tvuref1 := Link(ty2)
+          Ok()
+
+    | (_, TypeVar(Updatable({contents = Free(fid2)} as tvuref2))) ->
+        if occurs fid2 ty1 then
+          Error(InternalInclusion(fid2))
+        else
+          tvuref2 := Link(ty1)
+          Ok()
+
+    | (BaseType(bty1), BaseType(bty2)) ->
+        if bty1 = bty2 then Ok() else Error(InternalContradiction)
+
+    | (FuncType(ty11, ty12), FuncType(ty21, ty22)) ->
+        result {
+          let! () = aux ty11 ty21
+          let! () = aux ty12 ty22
+          return ()
+        }
+
+    | _ ->
+        Error(InternalContradiction)
+  in
+  aux ty1 ty2 |> Result.mapError begin function
+  | InternalInclusion(fid) -> Inclusion(fid, ty1, ty2)
+  | InternalContradiction  -> Contradiction(ty1, ty2)
+  end
 
 
 let rec typecheck (tyenv : TypeEnv) (e : Ast) : Result<MonoType, TypeError> =

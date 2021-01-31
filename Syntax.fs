@@ -7,8 +7,16 @@ type Range =
   | ValidRange of Position * Position
   override this.ToString () =
     match this with
-    | DummyRange             -> "DUMMY"
-    | ValidRange(posL, posR) -> sprintf "%d:%d-%d:%d" posL.Line posL.Column posR.Line posR.Column
+    | DummyRange ->
+        "DUMMY"
+
+    | ValidRange(posL, posR) ->
+        let ln1 = posL.Line
+        let ln2 = posR.Line
+        if ln1 = ln2 then
+          sprintf "%d:%d-%d" ln1 posL.Column posR.Column
+        else
+          sprintf "%d:%d-%d:%d" ln1 posL.Column ln2 posR.Column
 
 
 type Ident =
@@ -29,7 +37,14 @@ and AstMain =
     | Apply(e1, e2)    -> sprintf "Apply(%O, %O)" e1 e2
     | Lambda(ident, e) -> sprintf "Lambda(%O, %O)" ident e
 
-type FreeId = int // temporary
+type FreeId private(n : int) =
+  static let mutable current = 0
+  new () =
+    current <- current + 1
+    new FreeId(current)
+  member this.Number = n
+  override this.ToString () =
+    sprintf "%d" n
 
 type BoundId = int // temporary
 
@@ -43,27 +58,62 @@ and TypeMain<'a> =
   | TypeVar  of 'a
   | BaseType of BaseType
   | FuncType of Type<'a> * Type<'a>
+  override this.ToString () =
+    match this with
+    | TypeVar(tv)        -> sprintf "TypeVar(%O)" tv
+    | BaseType(bty)      -> sprintf "BaseType(%O)" bty
+    | FuncType(ty1, ty2) -> sprintf "FuncType(%O, %O)" ty1 ty2
 
 type MonoTypeVarUpdatable =
   | Free of FreeId
   | Link of MonoType
+  override this.ToString () =
+    match this with
+    | Free(fid) -> sprintf "%O" fid
+    | Link(ty)  -> sprintf "%O" ty
 
 and MonoTypeVar =
   | Updatable of MonoTypeVarUpdatable ref
+  override this.ToString () =
+    match this with
+    | Updatable(tvuref) ->
+        sprintf "%O" !tvuref
 
 and MonoType = Type<MonoTypeVar>
 
 type PolyTypeVar =
-  | Mono  of MonoTypeVarUpdatable
+  | Mono  of MonoTypeVar
   | Bound of BoundId
 
 type PolyType = Type<PolyTypeVar>
 
-let instantiate (pty : PolyType) : MonoType =
-  failwith "TODO: instantiate"
 
-let lift (ty : MonoType) : PolyType =
-  failwith "TODO: lift"
+let rec instantiate (pty : PolyType) : MonoType =
+  let (rng, ptyMain) = pty
+  match ptyMain with
+  | TypeVar(ptv) ->
+      match ptv with
+      | Mono(tv) ->
+          (rng, TypeVar(tv))
 
-let fresh () : FreeId =
-  failwith "TODO: fresh"
+      | Bound(_) ->
+          failwith "TODO: instantiate"
+
+  | BaseType(bty) ->
+      (rng, BaseType(bty))
+
+  | FuncType(pty1, pty2) ->
+      (rng, FuncType(instantiate pty1, instantiate pty2))
+
+
+let rec lift (ty : MonoType) : PolyType =
+  let (rng, tyMain) = ty
+  match tyMain with
+  | TypeVar(tv) ->
+      (rng, TypeVar(Mono(tv)))
+
+  | BaseType(bty) ->
+      (rng, BaseType(bty))
+
+  | FuncType(ty1, ty2) ->
+      (rng, FuncType(lift ty1, lift ty2))

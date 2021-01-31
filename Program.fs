@@ -11,15 +11,20 @@ type ProgramError =
 
 [<EntryPoint>]
 let main argv =
-  let input = "fun x -> fun y -> z (y x)"
+  let input = "fun x -> fun y -> y x"
   let tyenv = Map.empty
   let res =
     result {
       let! e = Parser.parse input |> Result.mapError (fun x -> ParseError(x))
-      printfn "Hello world %O" e
+      printfn "Expression: %O" e
       let! ty = TypeChecker.typecheck tyenv e |> Result.mapError (fun x -> TypeError(x))
+      printfn "Type: %O" ty
       return ()
     }
   match res with
-  | Ok(_) -> 0 // return an integer exit code
-  | _     -> 1
+  | Ok(_) ->
+      0
+
+  | Error(e) ->
+      printfn "Error: %O" e
+      1
