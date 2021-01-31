@@ -5,9 +5,6 @@ open FSharp.Core
 open MyUtil
 open Syntax
 
-type TypeEnv =
-  Map<string, PolyType>
-
 type TypeError =
   | UnboundVariable of Range
   | Inclusion       of FreeId * MonoType * MonoType
@@ -22,23 +19,6 @@ let freshMonoType (rng : Range) : MonoType =
   let fid = new FreeId()
   let tvuref = ref (Free(fid))
   (rng, TypeVar(Updatable(tvuref)))
-
-
-let rec occurs (fid0 : FreeId) ((_, tyMain) : MonoType) : bool =
-  let aux = occurs fid0
-  match tyMain with
-  | TypeVar(Updatable(tvuref)) ->
-      match !tvuref with
-      | Free(fid) -> fid = fid0
-      | Link(ty)  -> aux ty
-
-  | BaseType(_) ->
-      false
-
-  | FuncType(ty1, ty2) ->
-      let b1 = aux ty1
-      let b2 = aux ty2
-      b1 || b2
 
 
 let unify (ty1 : MonoType) (ty2 : MonoType) : Result<unit, TypeError> =
