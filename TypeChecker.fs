@@ -52,6 +52,13 @@ let unify (ty1 : MonoType) (ty2 : MonoType) : Result<unit, TypeError> =
     | (_, TypeVar(Updatable{contents = Link(ty2sub)})) ->
         aux ty1 ty2sub
 
+    | (TypeVar(Updatable({contents = Free(fid1)} as tvuref1)), TypeVar(Updatable{contents = Free(fid2)})) ->
+        if fid1 = fid2 then
+          Ok()
+        else
+          tvuref1 := Link(ty2)
+          Ok()
+
     | (TypeVar(Updatable({contents = Free(fid1)} as tvuref1)), _) ->
         if occurs fid1 ty2 then
           Error(InternalInclusion(fid1))
