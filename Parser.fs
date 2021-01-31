@@ -29,7 +29,7 @@ let identifierParser s =
     | x                    -> preturn x
     end
   let p = withRange pMain |>> (fun (r, x) -> Ident(r, x))
-  p s
+  (attempt p) s
 
 
 let rec absLevelParser s =
@@ -61,13 +61,15 @@ and appLevelParser s =
     many1 bottomLevelParser >>= function
     | []      -> failwith "bug"
     | e :: es -> preturn (List.fold (fun ef ex -> (makeRange ef ex, Apply(ef, ex))) e es)
-  p s
+  let res = p s
+  res
 
 
 and bottomLevelParser s =
   let p1 = identifierParser >>= fun ident -> match ident with Ident(r, _) -> preturn (r, Var(ident))
   let p2 = between (pstring "(" .>> spaces) (pstring ")") absLevelParser
-  ((p1 <|> p2) .>> spaces) s
+  let res = ((p1 <|> p2) .>> spaces) s
+  res
 
 
 let parse (s : string) : Result<Ast, ParseError> =

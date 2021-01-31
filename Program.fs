@@ -4,6 +4,7 @@ open System
 open FSharp.Core
 
 open MyUtil
+open Syntax
 
 type ProgramError =
   | ParseError of Parser.ParseError
@@ -18,7 +19,7 @@ let main argv =
       let! e = Parser.parse input |> Result.mapError (fun x -> ParseError(x))
       printfn "Expression: %O" e
       let! ty = TypeChecker.typecheck tyenv e |> Result.mapError (fun x -> TypeError(x))
-      printfn "Type: %O" ty
+      printfn "Type: %s" (showMonoType ty)
       return ()
     }
   match res with

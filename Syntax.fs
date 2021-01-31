@@ -53,7 +53,7 @@ type FreeId private(n : int) =
   member this.Number = n
 
   override this.ToString () =
-    sprintf "%d" n
+    sprintf "'%d" n
 
 type BoundId private(n : int) =
   static let mutable current = 0
@@ -65,7 +65,7 @@ type BoundId private(n : int) =
   member this.Number = n
 
   override this.ToString () =
-    sprintf "%d" n
+    sprintf "#%d" n
 
 type BaseType =
   | UnitType
@@ -224,3 +224,34 @@ let generalize (tyenv : TypeEnv) (ty : MonoType) : PolyType =
         fidDict.Add(fid, bid)
         Some(bid)
   generalizeScheme genf ty
+
+
+type ParenRequirement =
+  | Standalone
+  | Codomain
+
+
+let showBaseType = function
+  | UnitType -> "unit"
+
+
+let showMonoType (ty : MonoType) =
+  let rec aux (parenReq : ParenRequirement) (ty : MonoType) =
+    let (_, tyMain) = ty
+    match tyMain with
+    | TypeVar(Updatable(tvuref)) ->
+        match !tvuref with
+        | Free(fid)   -> fid.ToString()
+        | Link(tysub) -> aux parenReq tysub
+
+    | BaseType(bty) ->
+        showBaseType bty
+
+    | FuncType(ty1, ty2) ->
+        let s1 = aux Standalone ty1
+        let s2 = aux Codomain ty2
+        match parenReq with
+        | Standalone -> sprintf "(%s -> %s)" s1 s2
+        | Codomain   -> sprintf "%s -> %s" s1 s2
+  in
+  aux Codomain ty
