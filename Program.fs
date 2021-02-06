@@ -6,9 +6,11 @@ open FSharp.Core
 open MyUtil
 open Syntax
 
+
 type ProgramError =
   | ParseError of Parser.ParseError
   | TypeError  of TypeChecker.TypeError
+
 
 [<EntryPoint>]
 let main argv =

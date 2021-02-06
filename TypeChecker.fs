@@ -5,10 +5,12 @@ open FSharp.Core
 open MyUtil
 open Syntax
 
+
 type TypeError =
   | UnboundVariable of Range
   | Inclusion       of FreeId * MonoType * MonoType
   | Contradiction   of MonoType * MonoType
+
 
 type UnificationError =
   | InternalInclusion     of FreeId

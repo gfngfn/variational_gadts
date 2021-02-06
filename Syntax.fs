@@ -6,6 +6,7 @@ open FParsec
 type Range =
   | DummyRange
   | ValidRange of Position * Position
+
   override this.ToString () =
     match this with
     | DummyRange ->
@@ -19,6 +20,7 @@ type Range =
         else
           sprintf "%d:%d-%d:%d" ln1 posL.Column ln2 posR.Column
 
+
 type Ident =
   | Ident of Range * string
 
@@ -26,8 +28,10 @@ type Ident =
     match this with
     | Ident(r, x) -> sprintf "Ident(%O, \"%s\")" r x
 
+
 type Ast =
   Range * AstMain
+
 
 and AstMain =
   | Var    of Ident
@@ -42,6 +46,7 @@ and AstMain =
     | Lambda(ident, e) -> sprintf "Lambda(%O, %O)" ident e
     | LetIn(i, e1, e2) -> sprintf "LetIn(%O, %O, %O)" i e1 e2
 
+
 type FreeId private(n : int) =
 
   static let mutable current = 0
@@ -55,6 +60,7 @@ type FreeId private(n : int) =
   override this.ToString () =
     sprintf "'%d" n
 
+
 type BoundId private(n : int) =
   static let mutable current = 0
 
@@ -67,11 +73,14 @@ type BoundId private(n : int) =
   override this.ToString () =
     sprintf "#%d" n
 
+
 type BaseType =
   | UnitType
 
+
 type Type<'a> =
   Range * TypeMain<'a>
+
 
 and TypeMain<'a> =
   | TypeVar  of 'a
@@ -84,6 +93,7 @@ and TypeMain<'a> =
     | BaseType(bty)      -> sprintf "BaseType(%O)" bty
     | FuncType(ty1, ty2) -> sprintf "FuncType(%O, %O)" ty1 ty2
 
+
 type MonoTypeVarUpdatable =
   | Free of FreeId
   | Link of MonoType
@@ -93,6 +103,7 @@ type MonoTypeVarUpdatable =
     | Free(fid) -> sprintf "%O" fid
     | Link(ty)  -> sprintf "%O" ty
 
+
 and MonoTypeVar =
   | Updatable of MonoTypeVarUpdatable ref
 
@@ -101,15 +112,19 @@ and MonoTypeVar =
     | Updatable(tvuref) ->
         sprintf "%O" !tvuref
 
+
 and MonoType =
   Type<MonoTypeVar>
+
 
 type PolyTypeVar =
   | Mono  of MonoTypeVar
   | Bound of BoundId
 
+
 type PolyType =
   Type<PolyTypeVar>
+
 
 type TypeEnv =
   Map<string, PolyType>
