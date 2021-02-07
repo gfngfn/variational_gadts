@@ -7,9 +7,11 @@ open Syntax
 
 
 type TypeError =
-  | UnboundVariable of Range
+  | UnboundVariable of Range * string
+  | UnboundConstructor of Range * Constructor
   | Inclusion       of FreeId * MonoType * MonoType
   | Contradiction   of MonoType * MonoType
+  | ArityMismatch   of Range * int * int
 
 
 type UnificationError =
@@ -55,8 +57,11 @@ let unify (ty1 : MonoType) (ty2 : MonoType) : Result<unit, TypeError> =
           tvuref2 := Link(ty1)
           Ok()
 
-    | (BaseType(bty1), BaseType(bty2)) ->
-        if bty1 = bty2 then Ok() else Error(InternalContradiction)
+    | (DataType(dtid1, tys1), DataType(dtid2, tys2)) ->
+        if dtid1 = dtid2 then
+          auxList tys1 tys2
+        else
+          Error(InternalContradiction)
 
     | (FuncType(ty11, ty12), FuncType(ty21, ty22)) ->
         result {
@@ -67,6 +72,18 @@ let unify (ty1 : MonoType) (ty2 : MonoType) : Result<unit, TypeError> =
 
     | _ ->
         Error(InternalContradiction)
+
+  and auxList (tys1 : MonoType list) (tys2 : MonoType list) : Result<unit, UnificationError> =
+    try
+      List.fold2 (fun res ty1 ty2 ->
+        result {
+          let! () = res
+          let! () = aux ty1 ty2
+          return ()
+        }
+      ) (Ok()) tys1 tys2
+    with
+    | _ -> Error(InternalContradiction)
   in
   aux ty1 ty2 |> Result.mapError begin function
   | InternalInclusion(fid) -> Inclusion(fid, ty1, ty2)
@@ -74,22 +91,73 @@ let unify (ty1 : MonoType) (ty2 : MonoType) : Result<unit, TypeError> =
   end
 
 
+let unifyList (rng : Range) (tys1 : MonoType list) (tys2 : MonoType list) : Result<unit, TypeError> =
+  let len1 = List.length tys1
+  let len2 = List.length tys2
+  if len1 = len2 then
+    List.fold2 (fun res ty1 ty2 ->
+      result {
+        let! () = res
+        let! () = unify ty1 ty2
+        return ()
+      }
+    ) (Ok()) tys1 tys2
+  else
+    Error(ArityMismatch(rng, len1, len2))
+
+
+let typecheckBaseConstant (rng : Range) (bc : BaseConstant) =
+  match bc with
+  | UnitValue       -> unitType rng
+  | IntegerValue(_) -> intType rng
+
+
+let typecheckConstructor (tyenv : TypeEnv) (rng : Range) (ctor : string) : Result<MonoType list * MonoType, TypeError> =
+  match tyenv.TryFindConstructor(ctor) with
+  | None ->
+      Error(UnboundConstructor(rng, ctor))
+
+  | Some(ctordef) ->
+      let bidMap : Map<BoundId, MonoTypeVarUpdatable ref> =
+        ctordef.BoundIds |> List.fold (fun bidMap bid ->
+          let tvuref =
+            let fid = new FreeId()
+            ref (Free(fid))
+          bidMap.Add(bid, tvuref)
+        ) Map.empty
+      let tyArgs = ctordef.ArgTypes |> List.map (instantiateByMap bidMap)
+      let tyRet = ctordef.MainType |> instantiateByMap bidMap
+      Ok(tyArgs, tyRet)
+
+
 let rec typecheck (tyenv : TypeEnv) (e : Ast) : Result<MonoType, TypeError> =
   let (rng, eMain) = e in
   match eMain with
+  | BaseConstant(bc) ->
+      let ty = typecheckBaseConstant rng bc
+      Ok(ty)
+
+  | Constructor(ctor, es) ->
+      result {
+        let! (tysExpected, tyRes) = typecheckConstructor tyenv rng ctor
+        let! tysGiven = es |> List.mapM (typecheck tyenv)
+        let! () = unifyList rng tysGiven tysExpected
+        return tyRes
+      }
+
   | Var(Ident(_, x)) ->
-      match tyenv.TryFind(x) with
+      match tyenv.TryFindValue(x) with
       | Some(pty) ->
           let ty = instantiate pty
           Ok(ty)
 
       | None ->
-          Error(UnboundVariable(rng))
+          Error(UnboundVariable(rng, x))
 
   | Lambda(Ident(rngx, x), e0) ->
       let ty = freshMonoType rngx
       result {
-        let! ty0 = typecheck (tyenv.Add(x, lift ty)) e0
+        let! ty0 = typecheck (tyenv.AddValue(x, lift ty)) e0
         return (rng, FuncType(ty, ty0))
       }
 
@@ -106,6 +174,17 @@ let rec typecheck (tyenv : TypeEnv) (e : Ast) : Result<MonoType, TypeError> =
       result {
         let! ty1 = typecheck tyenv e1
         let pty1 = generalize tyenv ty1
-        let! ty2 = typecheck (tyenv.Add(x, pty1)) e2
+        let! ty2 = typecheck (tyenv.AddValue(x, pty1)) e2
+        return ty2
+      }
+
+  | LetRecIn(Ident(rngx, x), e1, e2) ->
+      let ty = freshMonoType rngx
+      let tyenv = tyenv.AddValue(x, lift ty)
+      result {
+        let! ty1 = typecheck tyenv e1
+        let! () = unify ty1 ty
+        let pty1 = generalize tyenv ty1
+        let! ty2 = typecheck tyenv e2
         return ty2
       }

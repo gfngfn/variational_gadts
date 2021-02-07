@@ -1,7 +1,9 @@
 module Syntax
 
+open System
 open System.Collections.Generic
 open FParsec
+
 
 type Range =
   | DummyRange
@@ -29,22 +31,37 @@ type Ident =
     | Ident(r, x) -> sprintf "Ident(%O, \"%s\")" r x
 
 
+type BaseConstant =
+  | UnitValue
+  | IntegerValue of int
+
+
+type Constructor =
+  string
+
+
 type Ast =
   Range * AstMain
 
 
 and AstMain =
-  | Var    of Ident
-  | Apply  of Ast * Ast
-  | Lambda of Ident * Ast
-  | LetIn  of Ident * Ast * Ast
+  | Var          of Ident
+  | Apply        of Ast * Ast
+  | Lambda       of Ident * Ast
+  | LetIn        of Ident * Ast * Ast
+  | LetRecIn     of Ident * Ast * Ast
+  | BaseConstant of BaseConstant
+  | Constructor  of Constructor * Ast list
 
   override this.ToString () =
     match this with
-    | Var(Ident(_, x)) -> sprintf "Var(\"%s\")" x
-    | Apply(e1, e2)    -> sprintf "Apply(%O, %O)" e1 e2
-    | Lambda(ident, e) -> sprintf "Lambda(%O, %O)" ident e
-    | LetIn(i, e1, e2) -> sprintf "LetIn(%O, %O, %O)" i e1 e2
+    | Var(Ident(_, x))      -> sprintf "Var(\"%s\")" x
+    | Apply(e1, e2)         -> sprintf "Apply(%O, %O)" e1 e2
+    | Lambda(ident, e)      -> sprintf "Lambda(%O, %O)" ident e
+    | LetIn(i, e1, e2)      -> sprintf "LetIn(%O, %O, %O)" i e1 e2
+    | LetRecIn(i, e1, e2)   -> sprintf "LetRecIn(%O, %O, %O)" i e1 e2
+    | BaseConstant(bc)      -> sprintf "BaseConstant(%O)" bc
+    | Constructor(ctor, es) -> sprintf "Constructor(%s, %O)" ctor es
 
 
 type FreeId private(n : int) =
@@ -57,7 +74,7 @@ type FreeId private(n : int) =
 
   member this.Number = n
 
-  override this.ToString () =
+  override this.ToString() =
     sprintf "'%d" n
 
 
@@ -70,12 +87,33 @@ type BoundId private(n : int) =
 
   member this.Number = n
 
-  override this.ToString () =
+  override this.ToString() =
     sprintf "#%d" n
 
+  override this.GetHashCode() =
+    this.Number.GetHashCode()
 
-type BaseType =
-  | UnitType
+  override this.Equals(obj: obj) =
+    match obj with
+    | :? BoundId as other -> this.Number = other.Number
+    | _                   -> invalidArg "obj" "not of type BoundId"
+
+  interface IComparable<BoundId> with
+    member this.CompareTo(other: BoundId) : int =
+      this.Number - other.Number
+
+  interface IComparable with
+    member this.CompareTo(obj: obj) =
+      match obj with
+      | :? BoundId as other -> this.Number - other.Number
+      | _                   -> invalidArg "obj" "not of type BoundId"
+
+
+type DataTypeId =
+  | UnitTypeId
+  | BoolTypeId
+  | IntTypeId
+  | ListTypeId
 
 
 type Type<'a> =
@@ -84,14 +122,14 @@ type Type<'a> =
 
 and TypeMain<'a> =
   | TypeVar  of 'a
-  | BaseType of BaseType
+  | DataType of DataTypeId * Type<'a> list
   | FuncType of Type<'a> * Type<'a>
 
   override this.ToString () =
     match this with
-    | TypeVar(tv)        -> sprintf "TypeVar(%O)" tv
-    | BaseType(bty)      -> sprintf "BaseType(%O)" bty
-    | FuncType(ty1, ty2) -> sprintf "FuncType(%O, %O)" ty1 ty2
+    | TypeVar(tv)         -> sprintf "TypeVar(%O)" tv
+    | DataType(dtid, tys) -> sprintf "BaseType(%O, %O)" dtid tys
+    | FuncType(ty1, ty2)  -> sprintf "FuncType(%O, %O)" ty1 ty2
 
 
 type MonoTypeVarUpdatable =
@@ -126,12 +164,59 @@ type PolyType =
   Type<PolyTypeVar>
 
 
+type ConstructorDef =
+  {
+    BoundIds : BoundId list;
+    MainType : PolyType;
+    ArgTypes : PolyType list;
+  }
+
+
 type TypeEnv =
-  Map<string, PolyType>
+  private {
+    Vars : Map<string, PolyType>;
+    Ctors : Map<Constructor, ConstructorDef>
+  }
+
+  static member empty =
+    {
+      Vars = Map.empty;
+      Ctors = Map.empty;
+    }
+
+  member this.FoldValue(f, init) =
+    this.Vars |> Map.fold f init
+
+  member this.TryFindValue(x) =
+    this.Vars.TryFind(x)
+
+  member this.AddValue(x, pty) =
+    { this with Vars = this.Vars.Add(x, pty) }
+
+  member this.AddConstructor(ctor, ctordef) =
+    { this with Ctors = this.Ctors.Add(ctor, ctordef) }
+
+  member this.TryFindConstructor(ctor) =
+    this.Ctors.TryFind(ctor)
 
 
-let instantiate (pty : PolyType) : MonoType =
-  let bidDict = new Dictionary<BoundId, MonoTypeVarUpdatable ref>()
+let unitType rng =
+  (rng, DataType(UnitTypeId, []))
+
+
+let boolType rng =
+  (rng, DataType(BoolTypeId, []))
+
+
+let intType rng =
+  (rng, DataType(IntTypeId, []))
+
+
+let listType rng ty =
+  (rng, DataType(ListTypeId, [ty]))
+
+
+let instantiateScheme (internf : BoundId -> MonoTypeVarUpdatable ref) (pty : PolyType) : MonoType =
   let rec aux pty =
     let (rng, ptyMain) = pty
     match ptyMain with
@@ -141,24 +226,38 @@ let instantiate (pty : PolyType) : MonoType =
             (rng, TypeVar(tv))
 
         | Bound(bid) ->
-            let tvuref =
-              if bidDict.ContainsKey(bid) then
-                bidDict.Item(bid)
-              else
-                let tvuref =
-                  let fid = new FreeId()
-                  ref (Free(fid))
-                bidDict.Add(bid, tvuref)
-                tvuref
+            let tvuref = internf bid
             (rng, TypeVar(Updatable(tvuref)))
 
-    | BaseType(bty) ->
-        (rng, BaseType(bty))
+    | DataType(dtid, ptys) ->
+        (rng, DataType(dtid, ptys |> List.map aux))
 
     | FuncType(pty1, pty2) ->
         (rng, FuncType(aux pty1, aux pty2))
   in
   aux pty
+
+
+let instantiate (pty : PolyType) : MonoType =
+  let bidDict = new Dictionary<BoundId, MonoTypeVarUpdatable ref>()
+  let internf (bid : BoundId) =
+    if bidDict.ContainsKey(bid) then
+      bidDict.Item(bid)
+    else
+      let tvuref =
+        let fid = new FreeId()
+        ref (Free(fid))
+      bidDict.Add(bid, tvuref)
+      tvuref
+  instantiateScheme internf pty
+
+
+let instantiateByMap (bidMap : Map<BoundId, MonoTypeVarUpdatable ref>) : PolyType -> MonoType =
+  let internf (bid : BoundId) =
+    match bidMap.TryFind(bid) with
+    | None          -> failwith "TODO: instantiateByMap, assertion failure"
+    | Some(mtvuref) -> mtvuref
+  instantiateScheme internf
 
 
 let rec occurs (fid0 : FreeId) ((_, tyMain) : MonoType) : bool =
@@ -169,8 +268,10 @@ let rec occurs (fid0 : FreeId) ((_, tyMain) : MonoType) : bool =
       | Free(fid) -> fid = fid0
       | Link(ty)  -> aux ty
 
-  | BaseType(_) ->
-      false
+  | DataType(_, tys) ->
+      tys |> List.tryFind aux |> function
+      | None    -> false
+      | Some(_) -> true
 
   | FuncType(ty1, ty2) ->
       let b1 = aux ty1
@@ -190,8 +291,10 @@ let rec occursPoly (fid0 : FreeId) (pty : PolyType) =
   | TypeVar(Bound(_)) ->
       false
 
-  | BaseType(_) ->
-      false
+  | DataType(_, ptys) ->
+      ptys |> List.tryFind aux |> function
+      | None    -> false
+      | Some(_) -> true
 
   | FuncType(pty1, pty2) ->
       aux pty1 || aux pty2
@@ -211,8 +314,8 @@ let rec generalizeScheme (genf : FreeId -> BoundId option) (ty : MonoType) : Pol
           | None      -> (rng, TypeVar(Mono(tv)))
           | Some(bid) -> (rng, TypeVar(Bound(bid)))
 
-  | BaseType(bty) ->
-      (rng, BaseType(bty))
+  | DataType(dtid, tys) ->
+      (rng, DataType(dtid, tys |> List.map aux))
 
   | FuncType(ty1, ty2) ->
       (rng, FuncType(aux ty1, aux ty2))
@@ -229,9 +332,9 @@ let generalize (tyenv : TypeEnv) (ty : MonoType) : PolyType =
       Some(fidDict.Item(fid))
     else
       let b =
-        tyenv |> Map.fold begin fun acc x pty ->
+        tyenv.FoldValue(begin fun acc x pty ->
           acc || occursPoly fid pty
-        end false
+        end, false)
       if b then
         None
       else
@@ -247,7 +350,10 @@ type ParenRequirement =
 
 
 let showBaseType = function
-  | UnitType -> "unit"
+  | UnitTypeId -> "unit"
+  | BoolTypeId -> "bool"
+  | IntTypeId  -> "int"
+  | ListTypeId -> "list"
 
 
 let showMonoType (ty : MonoType) =
@@ -259,8 +365,15 @@ let showMonoType (ty : MonoType) =
         | Free(fid)   -> fid.ToString()
         | Link(tysub) -> aux parenReq tysub
 
-    | BaseType(bty) ->
-        showBaseType bty
+    | DataType(dtid, tys) ->
+        let s = showBaseType dtid in
+        match tys with
+        | [] ->
+            s
+
+        | _ :: _ ->
+            let sargs = tys |> List.map (aux Standalone) |> String.concat " "
+            sprintf "%s %s" s sargs
 
     | FuncType(ty1, ty2) ->
         let s1 = aux Standalone ty1

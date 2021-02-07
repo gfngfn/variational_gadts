@@ -14,8 +14,17 @@ type ProgramError =
 
 [<EntryPoint>]
 let main argv =
-  let input = "let apply = fun x -> fun y -> x y in apply"
-  let tyenv = Map.empty
+(*
+  let input = "let apply = fun x -> fun y -> x 0 (cons y []) in apply"
+*)
+  let input = """
+let rec foldl = fun f -> fun acc -> fun xs ->
+  decompose_list xs
+    (fun u -> acc)
+    (fun y -> fun ys -> foldl f (f acc y) ys)
+in
+foldl"""
+  let tyenv = Primitives.initialTypeEnvironment
   let res =
     result {
       let! e = Parser.parse input |> Result.mapError (fun x -> ParseError(x))
