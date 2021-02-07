@@ -55,8 +55,11 @@ let unify (ty1 : MonoType) (ty2 : MonoType) : Result<unit, TypeError> =
           tvuref2 := Link(ty1)
           Ok()
 
-    | (BaseType(bty1), BaseType(bty2)) ->
-        if bty1 = bty2 then Ok() else Error(InternalContradiction)
+    | (DataType(dtid1, tys1), DataType(dtid2, tys2)) ->
+        if dtid1 = dtid2 then
+          auxList tys1 tys2
+        else
+          Error(InternalContradiction)
 
     | (FuncType(ty11, ty12), FuncType(ty21, ty22)) ->
         result {
@@ -67,6 +70,18 @@ let unify (ty1 : MonoType) (ty2 : MonoType) : Result<unit, TypeError> =
 
     | _ ->
         Error(InternalContradiction)
+
+  and auxList (tys1 : MonoType list) (tys2 : MonoType list) : Result<unit, UnificationError> =
+    try
+      List.fold2 (fun res ty1 ty2 ->
+        result {
+          let! () = res
+          let! () = aux ty1 ty2
+          return ()
+        }
+      ) (Ok()) tys1 tys2
+    with
+    | _ -> Error(InternalContradiction)
   in
   aux ty1 ty2 |> Result.mapError begin function
   | InternalInclusion(fid) -> Inclusion(fid, ty1, ty2)

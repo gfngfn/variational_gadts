@@ -77,8 +77,9 @@ type BoundId private(n : int) =
     sprintf "#%d" n
 
 
-type BaseType =
-  | UnitType
+type DataTypeId =
+  | UnitTypeId
+  | ListTypeId
 
 
 type Type<'a> =
@@ -87,14 +88,14 @@ type Type<'a> =
 
 and TypeMain<'a> =
   | TypeVar  of 'a
-  | BaseType of BaseType
+  | DataType of DataTypeId * Type<'a> list
   | FuncType of Type<'a> * Type<'a>
 
   override this.ToString () =
     match this with
-    | TypeVar(tv)        -> sprintf "TypeVar(%O)" tv
-    | BaseType(bty)      -> sprintf "BaseType(%O)" bty
-    | FuncType(ty1, ty2) -> sprintf "FuncType(%O, %O)" ty1 ty2
+    | TypeVar(tv)         -> sprintf "TypeVar(%O)" tv
+    | DataType(dtid, tys) -> sprintf "BaseType(%O, %O)" dtid tys
+    | FuncType(ty1, ty2)  -> sprintf "FuncType(%O, %O)" ty1 ty2
 
 
 type MonoTypeVarUpdatable =
@@ -155,8 +156,8 @@ let instantiate (pty : PolyType) : MonoType =
                 tvuref
             (rng, TypeVar(Updatable(tvuref)))
 
-    | BaseType(bty) ->
-        (rng, BaseType(bty))
+    | DataType(dtid, ptys) ->
+        (rng, DataType(dtid, ptys |> List.map aux))
 
     | FuncType(pty1, pty2) ->
         (rng, FuncType(aux pty1, aux pty2))
@@ -172,8 +173,10 @@ let rec occurs (fid0 : FreeId) ((_, tyMain) : MonoType) : bool =
       | Free(fid) -> fid = fid0
       | Link(ty)  -> aux ty
 
-  | BaseType(_) ->
-      false
+  | DataType(_, tys) ->
+      tys |> List.tryFind aux |> function
+      | None    -> false
+      | Some(_) -> true
 
   | FuncType(ty1, ty2) ->
       let b1 = aux ty1
@@ -193,8 +196,10 @@ let rec occursPoly (fid0 : FreeId) (pty : PolyType) =
   | TypeVar(Bound(_)) ->
       false
 
-  | BaseType(_) ->
-      false
+  | DataType(_, ptys) ->
+      ptys |> List.tryFind aux |> function
+      | None    -> false
+      | Some(_) -> true
 
   | FuncType(pty1, pty2) ->
       aux pty1 || aux pty2
@@ -214,8 +219,8 @@ let rec generalizeScheme (genf : FreeId -> BoundId option) (ty : MonoType) : Pol
           | None      -> (rng, TypeVar(Mono(tv)))
           | Some(bid) -> (rng, TypeVar(Bound(bid)))
 
-  | BaseType(bty) ->
-      (rng, BaseType(bty))
+  | DataType(dtid, tys) ->
+      (rng, DataType(dtid, tys |> List.map aux))
 
   | FuncType(ty1, ty2) ->
       (rng, FuncType(aux ty1, aux ty2))
@@ -250,7 +255,8 @@ type ParenRequirement =
 
 
 let showBaseType = function
-  | UnitType -> "unit"
+  | UnitTypeId -> "unit"
+  | ListTypeId -> "list"
 
 
 let showMonoType (ty : MonoType) =
@@ -262,8 +268,15 @@ let showMonoType (ty : MonoType) =
         | Free(fid)   -> fid.ToString()
         | Link(tysub) -> aux parenReq tysub
 
-    | BaseType(bty) ->
-        showBaseType bty
+    | DataType(dtid, tys) ->
+        let s = showBaseType dtid in
+        match tys with
+        | [] ->
+            s
+
+        | _ :: _ ->
+            let sargs = tys |> List.map (aux Standalone) |> String.concat " "
+            sprintf "%s %s" s sargs
 
     | FuncType(ty1, ty2) ->
         let s1 = aux Standalone ty1
