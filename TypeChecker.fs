@@ -11,6 +11,7 @@ type TypeError =
   | UnboundConstructor of Range * Constructor
   | Inclusion       of FreeId * MonoType * MonoType
   | Contradiction   of MonoType * MonoType
+  | ArityMismatch   of Range * int * int
 
 
 type UnificationError =
@@ -90,19 +91,43 @@ let unify (ty1 : MonoType) (ty2 : MonoType) : Result<unit, TypeError> =
   end
 
 
+let unifyList (rng : Range) (tys1 : MonoType list) (tys2 : MonoType list) : Result<unit, TypeError> =
+  let len1 = List.length tys1
+  let len2 = List.length tys2
+  if len1 = len2 then
+    List.fold2 (fun res ty1 ty2 ->
+      result {
+        let! () = res
+        let! () = unify ty1 ty2
+        return ()
+      }
+    ) (Ok()) tys1 tys2
+  else
+    Error(ArityMismatch(rng, len1, len2))
+
+
 let typecheckBaseConstant (rng : Range) (bc : BaseConstant) =
   match bc with
   | UnitValue       -> unitType rng
   | IntegerValue(_) -> intType rng
 
 
-let typecheckConstructor (tyenv : TypeEnv) (rng : Range) (ctor : string) =
+let typecheckConstructor (tyenv : TypeEnv) (rng : Range) (ctor : string) : Result<MonoType list * MonoType, TypeError> =
   match tyenv.TryFindConstructor(ctor) with
   | None ->
       Error(UnboundConstructor(rng, ctor))
 
   | Some(ctordef) ->
-      failwith "TODO: typecheckConstructor"
+      let bidMap : Map<BoundId, MonoTypeVarUpdatable ref> =
+        ctordef.BoundIds |> List.fold (fun bidMap bid ->
+          let tvuref =
+            let fid = new FreeId()
+            ref (Free(fid))
+          bidMap.Add(bid, tvuref)
+        ) Map.empty
+      let tyArgs = ctordef.ArgTypes |> List.map (instantiateByMap bidMap)
+      let tyRet = ctordef.MainType |> instantiateByMap bidMap
+      Ok(tyArgs, tyRet)
 
 
 let rec typecheck (tyenv : TypeEnv) (e : Ast) : Result<MonoType, TypeError> =
@@ -112,11 +137,11 @@ let rec typecheck (tyenv : TypeEnv) (e : Ast) : Result<MonoType, TypeError> =
       let ty = typecheckBaseConstant rng bc
       Ok(ty)
 
-  | Constructor(ctor, e0) ->
+  | Constructor(ctor, es) ->
       result {
-        let! (tyArg, tyRes) = typecheckConstructor tyenv rng ctor
-        let! ty0 = typecheck tyenv e0
-        let! () = unify ty0 tyArg
+        let! (tysExpected, tyRes) = typecheckConstructor tyenv rng ctor
+        let! tysGiven = es |> List.mapM (typecheck tyenv)
+        let! () = unifyList rng tysGiven tysExpected
         return tyRes
       }
 

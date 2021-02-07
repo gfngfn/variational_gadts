@@ -51,7 +51,7 @@ and AstMain =
   | LetIn        of Ident * Ast * Ast
   | LetRecIn     of Ident * Ast * Ast
   | BaseConstant of BaseConstant
-  | Constructor  of Constructor * Ast
+  | Constructor  of Constructor * Ast list
 
   override this.ToString () =
     match this with
@@ -61,7 +61,7 @@ and AstMain =
     | LetIn(i, e1, e2)     -> sprintf "LetIn(%O, %O, %O)" i e1 e2
     | LetRecIn(i, e1, e2)  -> sprintf "LetRecIn(%O, %O, %O)" i e1 e2
     | BaseConstant(bc)     -> sprintf "BaseConstant(%O)" bc
-    | Constructor(ctor, e) -> sprintf "Constructor(%s, %O)" ctor e
+    | Constructor(ctor, es) -> sprintf "Constructor(%s, %O)" ctor es
 
 
 type FreeId private(n : int) =
@@ -167,7 +167,7 @@ type ConstructorDef =
   {
     BoundIds : BoundId list;
     MainType : PolyType;
-    TypeArg  : PolyType;
+    ArgTypes : PolyType list;
   }
 
 
