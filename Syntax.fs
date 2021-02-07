@@ -30,6 +30,11 @@ type Ident =
     | Ident(r, x) -> sprintf "Ident(%O, \"%s\")" r x
 
 
+type BaseConstant =
+  | UnitValue
+  | IntegerValue of int
+
+
 type Ast =
   Range * AstMain
 
@@ -40,6 +45,7 @@ and AstMain =
   | Lambda of Ident * Ast
   | LetIn  of Ident * Ast * Ast
   | LetRecIn of Ident * Ast * Ast
+  | BaseConstant of BaseConstant
 
   override this.ToString () =
     match this with
@@ -48,6 +54,7 @@ and AstMain =
     | Lambda(ident, e) -> sprintf "Lambda(%O, %O)" ident e
     | LetIn(i, e1, e2) -> sprintf "LetIn(%O, %O, %O)" i e1 e2
     | LetRecIn(i, e1, e2) -> sprintf "LetRecIn(%O, %O, %O)" i e1 e2
+    | BaseConstant(bc)    -> sprintf "BaseConstant(%O)" bc
 
 
 type FreeId private(n : int) =
@@ -79,6 +86,7 @@ type BoundId private(n : int) =
 
 type DataTypeId =
   | UnitTypeId
+  | IntTypeId
   | ListTypeId
 
 
@@ -132,6 +140,14 @@ type PolyType =
 
 type TypeEnv =
   Map<string, PolyType>
+
+
+let unitType rng =
+  (rng, DataType(UnitTypeId, []))
+
+
+let intType rng =
+  (rng, DataType(IntTypeId, []))
 
 
 let instantiate (pty : PolyType) : MonoType =
@@ -256,6 +272,7 @@ type ParenRequirement =
 
 let showBaseType = function
   | UnitTypeId -> "unit"
+  | IntTypeId  -> "int"
   | ListTypeId -> "list"
 
 

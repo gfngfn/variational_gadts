@@ -89,9 +89,19 @@ let unify (ty1 : MonoType) (ty2 : MonoType) : Result<unit, TypeError> =
   end
 
 
+let typecheckBaseConstant (rng : Range) (bc : BaseConstant) =
+  match bc with
+  | UnitValue       -> unitType rng
+  | IntegerValue(_) -> intType rng
+
+
 let rec typecheck (tyenv : TypeEnv) (e : Ast) : Result<MonoType, TypeError> =
   let (rng, eMain) = e in
   match eMain with
+  | BaseConstant(bc) ->
+      let ty = typecheckBaseConstant rng bc
+      Ok(ty)
+
   | Var(Ident(_, x)) ->
       match tyenv.TryFind(x) with
       | Some(pty) ->
