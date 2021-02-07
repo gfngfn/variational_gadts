@@ -44,22 +44,22 @@ type Ast =
 
 
 and AstMain =
-  | Var    of Ident
-  | Apply  of Ast * Ast
-  | Lambda of Ident * Ast
-  | LetIn  of Ident * Ast * Ast
-  | LetRecIn of Ident * Ast * Ast
+  | Var          of Ident
+  | Apply        of Ast * Ast
+  | Lambda       of Ident * Ast
+  | LetIn        of Ident * Ast * Ast
+  | LetRecIn     of Ident * Ast * Ast
   | BaseConstant of BaseConstant
   | Constructor  of Constructor * Ast
 
   override this.ToString () =
     match this with
-    | Var(Ident(_, x)) -> sprintf "Var(\"%s\")" x
-    | Apply(e1, e2)    -> sprintf "Apply(%O, %O)" e1 e2
-    | Lambda(ident, e) -> sprintf "Lambda(%O, %O)" ident e
-    | LetIn(i, e1, e2) -> sprintf "LetIn(%O, %O, %O)" i e1 e2
-    | LetRecIn(i, e1, e2) -> sprintf "LetRecIn(%O, %O, %O)" i e1 e2
-    | BaseConstant(bc)    -> sprintf "BaseConstant(%O)" bc
+    | Var(Ident(_, x))     -> sprintf "Var(\"%s\")" x
+    | Apply(e1, e2)        -> sprintf "Apply(%O, %O)" e1 e2
+    | Lambda(ident, e)     -> sprintf "Lambda(%O, %O)" ident e
+    | LetIn(i, e1, e2)     -> sprintf "LetIn(%O, %O, %O)" i e1 e2
+    | LetRecIn(i, e1, e2)  -> sprintf "LetRecIn(%O, %O, %O)" i e1 e2
+    | BaseConstant(bc)     -> sprintf "BaseConstant(%O)" bc
     | Constructor(ctor, e) -> sprintf "Constructor(%s, %O)" ctor e
 
 
@@ -150,7 +150,7 @@ type TypeEnv =
   }
   static member empty =
     {
-      Vars = Map.empty
+      Vars = Map.empty;
     }
 
   member this.FoldValue(f, init) =
