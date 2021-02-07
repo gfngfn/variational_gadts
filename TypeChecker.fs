@@ -7,7 +7,8 @@ open Syntax
 
 
 type TypeError =
-  | UnboundVariable of Range
+  | UnboundVariable of Range * string
+  | UnboundConstructor of Range * Constructor
   | Inclusion       of FreeId * MonoType * MonoType
   | Contradiction   of MonoType * MonoType
 
@@ -95,12 +96,14 @@ let typecheckBaseConstant (rng : Range) (bc : BaseConstant) =
   | IntegerValue(_) -> intType rng
 
 
-let typecheckConstructor (tyenv : TypeEnv) (ctor : string) =
-  failwith "TODO"
-(*
+let typecheckConstructor (tyenv : TypeEnv) (rng : Range) (ctor : string) =
   match tyenv.TryFindConstructor(ctor) with
-  | _ ->
-*)
+  | None ->
+      Error(UnboundConstructor(rng, ctor))
+
+  | Some(ctordef) ->
+      failwith "TODO: typecheckConstructor"
+
 
 let rec typecheck (tyenv : TypeEnv) (e : Ast) : Result<MonoType, TypeError> =
   let (rng, eMain) = e in
@@ -111,7 +114,7 @@ let rec typecheck (tyenv : TypeEnv) (e : Ast) : Result<MonoType, TypeError> =
 
   | Constructor(ctor, e0) ->
       result {
-        let! (tyArg, tyRes) = typecheckConstructor tyenv ctor
+        let! (tyArg, tyRes) = typecheckConstructor tyenv rng ctor
         let! ty0 = typecheck tyenv e0
         let! () = unify ty0 tyArg
         return tyRes
@@ -124,7 +127,7 @@ let rec typecheck (tyenv : TypeEnv) (e : Ast) : Result<MonoType, TypeError> =
           Ok(ty)
 
       | None ->
-          Error(UnboundVariable(rng))
+          Error(UnboundVariable(rng, x))
 
   | Lambda(Ident(rngx, x), e0) ->
       let ty = freshMonoType rngx

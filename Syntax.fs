@@ -1,5 +1,6 @@
 module Syntax
 
+open System
 open System.Collections.Generic
 open FParsec
 
@@ -73,7 +74,7 @@ type FreeId private(n : int) =
 
   member this.Number = n
 
-  override this.ToString () =
+  override this.ToString() =
     sprintf "'%d" n
 
 
@@ -86,8 +87,26 @@ type BoundId private(n : int) =
 
   member this.Number = n
 
-  override this.ToString () =
+  override this.ToString() =
     sprintf "#%d" n
+
+  override this.GetHashCode() =
+    this.Number.GetHashCode()
+
+  override this.Equals(obj: obj) =
+    match obj with
+    | :? BoundId as other -> this.Number = other.Number
+    | _                   -> invalidArg "obj" "not of type BoundId"
+
+  interface IComparable<BoundId> with
+    member this.CompareTo(other: BoundId) : int =
+      this.Number - other.Number
+
+  interface IComparable with
+    member this.CompareTo(obj: obj) =
+      match obj with
+      | :? BoundId as other -> this.Number - other.Number
+      | _                   -> invalidArg "obj" "not of type BoundId"
 
 
 type DataTypeId =
@@ -144,13 +163,24 @@ type PolyType =
   Type<PolyTypeVar>
 
 
-type TypeEnv =
+type ConstructorDef =
   {
-    Vars : Map<string, PolyType>;
+    BoundIds : BoundId list;
+    MainType : PolyType;
+    TypeArg  : PolyType;
   }
+
+
+type TypeEnv =
+  private {
+    Vars : Map<string, PolyType>;
+    Ctors : Map<Constructor, ConstructorDef>
+  }
+
   static member empty =
     {
       Vars = Map.empty;
+      Ctors = Map.empty;
     }
 
   member this.FoldValue(f, init) =
@@ -162,6 +192,12 @@ type TypeEnv =
   member this.AddValue(x, pty) =
     { this with Vars = this.Vars.Add(x, pty) }
 
+  member this.AddConstructor(ctor, ctordef) =
+    { this with Ctors = this.Ctors.Add(ctor, ctordef) }
+
+  member this.TryFindConstructor(ctor) =
+    this.Ctors.TryFind(ctor)
+
 
 let unitType rng =
   (rng, DataType(UnitTypeId, []))
@@ -171,8 +207,7 @@ let intType rng =
   (rng, DataType(IntTypeId, []))
 
 
-let instantiate (pty : PolyType) : MonoType =
-  let bidDict = new Dictionary<BoundId, MonoTypeVarUpdatable ref>()
+let instantiateScheme (internf : BoundId -> MonoTypeVarUpdatable ref) (pty : PolyType) : MonoType =
   let rec aux pty =
     let (rng, ptyMain) = pty
     match ptyMain with
@@ -182,15 +217,7 @@ let instantiate (pty : PolyType) : MonoType =
             (rng, TypeVar(tv))
 
         | Bound(bid) ->
-            let tvuref =
-              if bidDict.ContainsKey(bid) then
-                bidDict.Item(bid)
-              else
-                let tvuref =
-                  let fid = new FreeId()
-                  ref (Free(fid))
-                bidDict.Add(bid, tvuref)
-                tvuref
+            let tvuref = internf bid
             (rng, TypeVar(Updatable(tvuref)))
 
     | DataType(dtid, ptys) ->
@@ -200,6 +227,28 @@ let instantiate (pty : PolyType) : MonoType =
         (rng, FuncType(aux pty1, aux pty2))
   in
   aux pty
+
+
+let instantiate (pty : PolyType) : MonoType =
+  let bidDict = new Dictionary<BoundId, MonoTypeVarUpdatable ref>()
+  let internf (bid : BoundId) =
+    if bidDict.ContainsKey(bid) then
+      bidDict.Item(bid)
+    else
+      let tvuref =
+        let fid = new FreeId()
+        ref (Free(fid))
+      bidDict.Add(bid, tvuref)
+      tvuref
+  instantiateScheme internf pty
+
+
+let instantiateByMap (bidMap : Map<BoundId, MonoTypeVarUpdatable ref>) : PolyType -> MonoType =
+  let internf (bid : BoundId) =
+    match bidMap.TryFind(bid) with
+    | None          -> failwith "TODO: instantiateByMap, assertion failure"
+    | Some(mtvuref) -> mtvuref
+  instantiateScheme internf
 
 
 let rec occurs (fid0 : FreeId) ((_, tyMain) : MonoType) : bool =
