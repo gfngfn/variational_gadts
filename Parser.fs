@@ -26,8 +26,8 @@ let identifierParser s =
     let isIdentifierFirstChar c = isLetter c
     let isIdentifierChar c = isLetter c || isDigit c || c = '_'
     many1Satisfy2L isIdentifierFirstChar isIdentifierChar "identifier" >>= begin function
-    | "fun" | "let" | "in" -> fail "reserved word"
-    | x                    -> preturn x
+    | "fun" | "let" | "in" | "rec" -> fail "reserved word"
+    | x                            -> preturn x
     end
   let p = withRange pMain |>> (fun (r, x) -> Ident(r, x))
   (attempt p) s
@@ -38,12 +38,20 @@ let rec absLevelParser s =
 
 
 and letParser s =
-  let p1 : Parser<Ident, 'u> =
-    pstring "let" .>> spaces >>. identifierParser .>> spaces .>> pstring "=" .>> spaces
-  let p2f (ident : Ident) : Parser<AstMain, 'u> =
+  let p1 : Parser<bool * Ident, 'u> =
+    let pRec : Parser<bool, 'u> =
+       opt (pstring "rec" .>> spaces) |>> function
+       | None    -> false
+       | Some(_) -> true
+    pstring "let" .>> spaces >>. pRec .>>. identifierParser .>> spaces .>> pstring "=" .>> spaces
+  let p2f ((isRec, ident) : bool * Ident) : Parser<AstMain, 'u> =
     let p21 = absLevelParser .>> pstring "in" .>> spaces
     let p22 = absLevelParser
-    pipe2 p21 p22 (fun e1 e2 -> LetIn(ident, e1, e2))
+    pipe2 p21 p22 (fun e1 e2 ->
+      if isRec then
+        LetRecIn(ident, e1, e2)
+      else
+        LetIn(ident, e1, e2))
   let p = withRange (p1 >>= p2f)
   p s
 
