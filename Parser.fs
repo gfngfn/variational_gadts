@@ -33,6 +33,11 @@ let identifierParser s =
   (attempt p) s
 
 
+let integerParser s =
+  let p = withRange (many1Satisfy isDigit |>> int)
+  p s
+
+
 let rec absLevelParser s =
   (letParser <|> abstractionParser <|> appLevelParser) s
 
@@ -75,9 +80,11 @@ and appLevelParser s =
 
 
 and bottomLevelParser s =
-  let p1 = identifierParser >>= fun ident -> match ident with Ident(r, _) -> preturn (r, Var(ident))
-  let p2 = between (pstring "(" .>> spaces) (pstring ")") absLevelParser
-  let res = ((p1 <|> p2) .>> spaces) s
+  let pIdent = identifierParser >>= fun ident -> match ident with Ident(r, _) -> preturn (r, Var(ident))
+  let pUnitConst = withRange (pstring "()" |>> fun _ -> BaseConstant(UnitValue))
+  let pIntConst = integerParser |>> fun (r, n) -> (r, BaseConstant(IntegerValue(n)))
+  let pParen = between (pstring "(" .>> spaces) (pstring ")") absLevelParser
+  let res = ((pIdent <|> pUnitConst <|> pIntConst <|> pParen) .>> spaces) s
   res
 
 
