@@ -111,6 +111,7 @@ type BoundId private(n : int) =
 
 type DataTypeId =
   | UnitTypeId
+  | BoolTypeId
   | IntTypeId
   | ListTypeId
 
@@ -201,6 +202,10 @@ type TypeEnv =
 
 let unitType rng =
   (rng, DataType(UnitTypeId, []))
+
+
+let boolType rng =
+  (rng, DataType(BoolTypeId, []))
 
 
 let intType rng =
@@ -346,6 +351,7 @@ type ParenRequirement =
 
 let showBaseType = function
   | UnitTypeId -> "unit"
+  | BoolTypeId -> "bool"
   | IntTypeId  -> "int"
   | ListTypeId -> "list"
 

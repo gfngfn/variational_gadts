@@ -23,7 +23,19 @@ let primitiveValues : (string * PolyType) list =
       let (_, pty) = freshBoundType ()
       let ptyList = listType dummy pty
       ("cons", pty --> (ptyList --> ptyList))
-    end
+    end;
+    begin
+      let (_, pty) = freshBoundType ()
+      ("is_empty", listType dummy pty --> boolType dummy)
+    end;
+    begin
+      let (_, ptyElem) = freshBoundType ()
+      let (_, ptyRes) = freshBoundType ()
+      let ptyList = listType dummy ptyElem
+      let ptyNilFun = unitType dummy --> ptyRes
+      let ptyConsFun = ptyElem --> (ptyList --> ptyRes)
+      ("decompose_list", ptyList --> (ptyNilFun --> (ptyConsFun --> ptyRes)))
+    end;
   ]
 
 
@@ -38,7 +50,7 @@ let primitiveConstructors : (Constructor * ConstructorDef) list =
           ArgTypes = [];
         }
       ("[]", ctordef)
-    end
+    end;
   ]
 
 

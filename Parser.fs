@@ -89,6 +89,6 @@ and bottomLevelParser s =
 
 
 let parse (s : string) : Result<Ast, ParseError> =
-  match run absLevelParser s with
+  match run (spaces >>. absLevelParser) s with
   | Success(e, _, _)   -> Result.Ok(e)
   | Failure(msg, _, _) -> Result.Error(msg)
