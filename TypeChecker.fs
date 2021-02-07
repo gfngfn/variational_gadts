@@ -109,3 +109,14 @@ let rec typecheck (tyenv : TypeEnv) (e : Ast) : Result<MonoType, TypeError> =
         let! ty2 = typecheck (tyenv.Add(x, pty1)) e2
         return ty2
       }
+
+  | LetRecIn(Ident(rngx, x), e1, e2) ->
+      let ty = freshMonoType rngx
+      let tyenv = tyenv.Add(x, lift ty)
+      result {
+        let! ty1 = typecheck tyenv e1
+        let! () = unify ty1 ty
+        let pty1 = generalize tyenv ty1
+        let! ty2 = typecheck tyenv e2
+        return ty2
+      }

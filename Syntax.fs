@@ -3,6 +3,7 @@ module Syntax
 open System.Collections.Generic
 open FParsec
 
+
 type Range =
   | DummyRange
   | ValidRange of Position * Position
@@ -38,6 +39,7 @@ and AstMain =
   | Apply  of Ast * Ast
   | Lambda of Ident * Ast
   | LetIn  of Ident * Ast * Ast
+  | LetRecIn of Ident * Ast * Ast
 
   override this.ToString () =
     match this with
@@ -45,6 +47,7 @@ and AstMain =
     | Apply(e1, e2)    -> sprintf "Apply(%O, %O)" e1 e2
     | Lambda(ident, e) -> sprintf "Lambda(%O, %O)" ident e
     | LetIn(i, e1, e2) -> sprintf "LetIn(%O, %O, %O)" i e1 e2
+    | LetRecIn(i, e1, e2) -> sprintf "LetRecIn(%O, %O, %O)" i e1 e2
 
 
 type FreeId private(n : int) =
