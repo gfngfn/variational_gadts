@@ -207,6 +207,10 @@ let intType rng =
   (rng, DataType(IntTypeId, []))
 
 
+let listType rng ty =
+  (rng, DataType(ListTypeId, [ty]))
+
+
 let instantiateScheme (internf : BoundId -> MonoTypeVarUpdatable ref) (pty : PolyType) : MonoType =
   let rec aux pty =
     let (rng, ptyMain) = pty

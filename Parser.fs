@@ -75,17 +75,17 @@ and appLevelParser s =
     many1 bottomLevelParser >>= function
     | []      -> failwith "bug"
     | e :: es -> preturn (List.fold (fun ef ex -> (makeRange ef ex, Apply(ef, ex))) e es)
-  let res = p s
-  res
+  p s
 
 
 and bottomLevelParser s =
   let pIdent = identifierParser >>= fun ident -> match ident with Ident(r, _) -> preturn (r, Var(ident))
+  let pNil = withRange (pstring "[]" |>> fun _ -> Constructor("[]", []))
   let pUnitConst = withRange (pstring "()" |>> fun _ -> BaseConstant(UnitValue))
   let pIntConst = integerParser |>> fun (r, n) -> (r, BaseConstant(IntegerValue(n)))
   let pParen = between (pstring "(" .>> spaces) (pstring ")") absLevelParser
-  let res = ((pIdent <|> pUnitConst <|> pIntConst <|> pParen) .>> spaces) s
-  res
+  let p = (pIdent <|> pNil <|> pUnitConst <|> pIntConst <|> pParen) .>> spaces
+  p s
 
 
 let parse (s : string) : Result<Ast, ParseError> =

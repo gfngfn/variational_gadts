@@ -14,8 +14,8 @@ type ProgramError =
 
 [<EntryPoint>]
 let main argv =
-  let input = "let apply = fun x -> fun y -> x y 0 in apply"
-  let tyenv = TypeEnv.empty
+  let input = "let apply = fun x -> fun y -> x 0 (cons y []) in apply"
+  let tyenv = Primitives.initialTypeEnvironment
   let res =
     result {
       let! e = Parser.parse input |> Result.mapError (fun x -> ParseError(x))
