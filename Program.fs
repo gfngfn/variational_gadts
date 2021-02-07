@@ -15,7 +15,7 @@ type ProgramError =
 [<EntryPoint>]
 let main argv =
   let input = "let apply = fun x -> fun y -> x y 0 in apply"
-  let tyenv = Map.empty
+  let tyenv = TypeEnv.empty
   let res =
     result {
       let! e = Parser.parse input |> Result.mapError (fun x -> ParseError(x))

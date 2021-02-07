@@ -95,6 +95,13 @@ let typecheckBaseConstant (rng : Range) (bc : BaseConstant) =
   | IntegerValue(_) -> intType rng
 
 
+let typecheckConstructor (tyenv : TypeEnv) (ctor : string) =
+  failwith "TODO"
+(*
+  match tyenv.TryFindConstructor(ctor) with
+  | _ ->
+*)
+
 let rec typecheck (tyenv : TypeEnv) (e : Ast) : Result<MonoType, TypeError> =
   let (rng, eMain) = e in
   match eMain with
@@ -102,8 +109,16 @@ let rec typecheck (tyenv : TypeEnv) (e : Ast) : Result<MonoType, TypeError> =
       let ty = typecheckBaseConstant rng bc
       Ok(ty)
 
+  | Constructor(ctor, e0) ->
+      result {
+        let! (tyArg, tyRes) = typecheckConstructor tyenv ctor
+        let! ty0 = typecheck tyenv e0
+        let! () = unify ty0 tyArg
+        return tyRes
+      }
+
   | Var(Ident(_, x)) ->
-      match tyenv.TryFind(x) with
+      match tyenv.TryFindValue(x) with
       | Some(pty) ->
           let ty = instantiate pty
           Ok(ty)
@@ -114,7 +129,7 @@ let rec typecheck (tyenv : TypeEnv) (e : Ast) : Result<MonoType, TypeError> =
   | Lambda(Ident(rngx, x), e0) ->
       let ty = freshMonoType rngx
       result {
-        let! ty0 = typecheck (tyenv.Add(x, lift ty)) e0
+        let! ty0 = typecheck (tyenv.AddValue(x, lift ty)) e0
         return (rng, FuncType(ty, ty0))
       }
 
@@ -131,13 +146,13 @@ let rec typecheck (tyenv : TypeEnv) (e : Ast) : Result<MonoType, TypeError> =
       result {
         let! ty1 = typecheck tyenv e1
         let pty1 = generalize tyenv ty1
-        let! ty2 = typecheck (tyenv.Add(x, pty1)) e2
+        let! ty2 = typecheck (tyenv.AddValue(x, pty1)) e2
         return ty2
       }
 
   | LetRecIn(Ident(rngx, x), e1, e2) ->
       let ty = freshMonoType rngx
-      let tyenv = tyenv.Add(x, lift ty)
+      let tyenv = tyenv.AddValue(x, lift ty)
       result {
         let! ty1 = typecheck tyenv e1
         let! () = unify ty1 ty

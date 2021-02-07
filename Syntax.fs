@@ -35,6 +35,10 @@ type BaseConstant =
   | IntegerValue of int
 
 
+type Constructor =
+  string
+
+
 type Ast =
   Range * AstMain
 
@@ -46,6 +50,7 @@ and AstMain =
   | LetIn  of Ident * Ast * Ast
   | LetRecIn of Ident * Ast * Ast
   | BaseConstant of BaseConstant
+  | Constructor  of Constructor * Ast
 
   override this.ToString () =
     match this with
@@ -55,6 +60,7 @@ and AstMain =
     | LetIn(i, e1, e2) -> sprintf "LetIn(%O, %O, %O)" i e1 e2
     | LetRecIn(i, e1, e2) -> sprintf "LetRecIn(%O, %O, %O)" i e1 e2
     | BaseConstant(bc)    -> sprintf "BaseConstant(%O)" bc
+    | Constructor(ctor, e) -> sprintf "Constructor(%s, %O)" ctor e
 
 
 type FreeId private(n : int) =
@@ -139,7 +145,22 @@ type PolyType =
 
 
 type TypeEnv =
-  Map<string, PolyType>
+  {
+    Vars : Map<string, PolyType>;
+  }
+  static member empty =
+    {
+      Vars = Map.empty
+    }
+
+  member this.FoldValue(f, init) =
+    this.Vars |> Map.fold f init
+
+  member this.TryFindValue(x) =
+    this.Vars.TryFind(x)
+
+  member this.AddValue(x, pty) =
+    { this with Vars = this.Vars.Add(x, pty) }
 
 
 let unitType rng =
@@ -253,9 +274,9 @@ let generalize (tyenv : TypeEnv) (ty : MonoType) : PolyType =
       Some(fidDict.Item(fid))
     else
       let b =
-        tyenv |> Map.fold begin fun acc x pty ->
+        tyenv.FoldValue(begin fun acc x pty ->
           acc || occursPoly fid pty
-        end false
+        end, false)
       if b then
         None
       else
