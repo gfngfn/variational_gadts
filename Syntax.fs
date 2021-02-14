@@ -33,6 +33,7 @@ type Ident =
 
 type BaseConstant =
   | UnitValue
+  | BooleanValue of bool
   | IntegerValue of int
 
 

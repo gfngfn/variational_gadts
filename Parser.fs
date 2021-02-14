@@ -26,8 +26,16 @@ let identifierParser s =
     let isIdentifierFirstChar c = isLetter c
     let isIdentifierChar c = isLetter c || isDigit c || c = '_'
     many1Satisfy2L isIdentifierFirstChar isIdentifierChar "identifier" >>= begin function
-    | "fun" | "let" | "in" | "rec" -> fail "reserved word"
-    | x                            -> preturn x
+    | "fun"
+    | "let"
+    | "in"
+    | "rec"
+    | "true"
+    | "false" ->
+        fail "reserved word"
+
+    | x ->
+        preturn x
     end
   let p = withRange pMain |>> (fun (r, x) -> Ident(r, x))
   (attempt p) s
@@ -81,10 +89,12 @@ and appLevelParser s =
 and bottomLevelParser s =
   let pIdent = identifierParser >>= fun ident -> match ident with Ident(r, _) -> preturn (r, Var(ident))
   let pNil = withRange (pstring "[]" |>> fun _ -> Constructor("[]", []))
+  let pTrue = withRange (pstring "true" |>> fun _ -> BaseConstant(BooleanValue(true)))
+  let pFalse = withRange (pstring "false" |>> fun _ -> BaseConstant(BooleanValue(false)))
   let pUnitConst = withRange (pstring "()" |>> fun _ -> BaseConstant(UnitValue))
   let pIntConst = integerParser |>> fun (r, n) -> (r, BaseConstant(IntegerValue(n)))
   let pParen = between (pstring "(" .>> spaces) (pstring ")") absLevelParser
-  let p = (pIdent <|> pNil <|> pUnitConst <|> pIntConst <|> pParen) .>> spaces
+  let p = (pIdent <|> pNil <|> pTrue <|> pFalse <|> pUnitConst <|> pIntConst <|> pParen) .>> spaces
   p s
 
 

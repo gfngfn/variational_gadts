@@ -109,6 +109,7 @@ let unifyList (rng : Range) (tys1 : MonoType list) (tys2 : MonoType list) : Resu
 let typecheckBaseConstant (rng : Range) (bc : BaseConstant) =
   match bc with
   | UnitValue       -> unitType rng
+  | BooleanValue(_) -> boolType rng
   | IntegerValue(_) -> intType rng
 
 
