@@ -8,9 +8,20 @@ open MyUtil
 let Setup () =
     ()
 
-[<Test>]
-let Test1 () =
-  let input = "let apply = fun x -> fun y -> x 0 (cons y []) in apply"
+[<TestCase(
+  "let apply = fun x -> fun y -> x 0 (cons y []) in apply"
+)>]
+[<TestCase(
+  """
+  let rec foldl = fun f -> fun acc -> fun xs ->
+    decompose_list xs
+      (fun u -> acc)
+      (fun y -> fun ys -> foldl f (f acc y) ys)
+  in
+  foldl
+  """
+)>]
+let Test1 (input : string) =
   let tyenv = Primitives.initialTypeEnvironment
   let res =
     result {
