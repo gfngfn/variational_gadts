@@ -51,18 +51,20 @@ and AstMain =
   | Lambda       of Ident * Ast
   | LetIn        of Ident * Ast * Ast
   | LetRecIn     of Ident * Ast * Ast
+  | IfThenElse   of Ast * Ast * Ast
   | BaseConstant of BaseConstant
   | Constructor  of Constructor * Ast list
 
   override this.ToString () =
     match this with
-    | Var(Ident(_, x))      -> sprintf "Var(\"%s\")" x
-    | Apply(e1, e2)         -> sprintf "Apply(%O, %O)" e1 e2
-    | Lambda(ident, e)      -> sprintf "Lambda(%O, %O)" ident e
-    | LetIn(i, e1, e2)      -> sprintf "LetIn(%O, %O, %O)" i e1 e2
-    | LetRecIn(i, e1, e2)   -> sprintf "LetRecIn(%O, %O, %O)" i e1 e2
-    | BaseConstant(bc)      -> sprintf "BaseConstant(%O)" bc
-    | Constructor(ctor, es) -> sprintf "Constructor(%s, %O)" ctor es
+    | Var(Ident(_, x))       -> sprintf "Var(\"%s\")" x
+    | Apply(e1, e2)          -> sprintf "Apply(%O, %O)" e1 e2
+    | Lambda(ident, e)       -> sprintf "Lambda(%O, %O)" ident e
+    | LetIn(i, e1, e2)       -> sprintf "LetIn(%O, %O, %O)" i e1 e2
+    | LetRecIn(i, e1, e2)    -> sprintf "LetRecIn(%O, %O, %O)" i e1 e2
+    | IfThenElse(e0, e1, e2) -> sprintf "IfThenElse(%O, %O, %O)" e0 e1 e2
+    | BaseConstant(bc)       -> sprintf "BaseConstant(%O)" bc
+    | Constructor(ctor, es)  -> sprintf "Constructor(%s, %O)" ctor es
 
 
 type FreeId private(n : int) =

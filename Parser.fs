@@ -27,11 +27,9 @@ let identifierParser s =
     let isIdentifierChar c = isLetter c || isDigit c || c = '_'
     many1Satisfy2L isIdentifierFirstChar isIdentifierChar "identifier" >>= begin function
     | "fun"
-    | "let"
-    | "in"
-    | "rec"
-    | "true"
-    | "false" ->
+    | "let" | "in" | "rec"
+    | "if" | "then" | "else"
+    | "true" | "false" ->
         fail "reserved word"
 
     | x ->
@@ -47,7 +45,7 @@ let integerParser s =
 
 
 let rec absLevelParser s =
-  (letParser <|> abstractionParser <|> appLevelParser) s
+  (letParser <|> ifParser <|> abstractionParser <|> appLevelParser) s
 
 
 and letParser s =
@@ -66,6 +64,14 @@ and letParser s =
       else
         LetIn(ident, e1, e2))
   let p = withRange (p1 >>= p2f)
+  p s
+
+
+and ifParser s =
+  let p0 = pstring "if" .>> spaces >>. absLevelParser .>> spaces
+  let p1 = pstring "then" .>> spaces >>. absLevelParser .>> spaces
+  let p2 = pstring "else" .>> spaces >>. absLevelParser .>> spaces
+  let p = withRange (pipe3 p0 p1 p2 (fun e0 e1 e2 -> IfThenElse(e0, e1, e2)))
   p s
 
 

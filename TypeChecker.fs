@@ -189,3 +189,13 @@ let rec typecheck (tyenv : TypeEnv) (e : Ast) : Result<MonoType, TypeError> =
         let! ty2 = typecheck tyenv e2
         return ty2
       }
+
+  | IfThenElse(e0, e1, e2) ->
+      result {
+        let! ty0 = typecheck tyenv e0
+        let! () = unify ty0 (boolType DummyRange)
+        let! ty1 = typecheck tyenv e1
+        let! ty2 = typecheck tyenv e2
+        let! () = unify ty1 ty2
+        return ty1
+      }
