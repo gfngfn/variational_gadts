@@ -44,14 +44,14 @@ let unify (ty1 : MonoType) (ty2 : MonoType) : Result<unit, TypeError> =
           Ok()
 
     | (TypeVar(Updatable({contents = Free(fid1)} as tvuref1)), _) ->
-        if occurs fid1 ty2 then
+        if TypeConv.occurs fid1 ty2 then
           Error(InternalInclusion(fid1))
         else
           tvuref1 := Link(ty2)
           Ok()
 
     | (_, TypeVar(Updatable({contents = Free(fid2)} as tvuref2))) ->
-        if occurs fid2 ty1 then
+        if TypeConv.occurs fid2 ty1 then
           Error(InternalInclusion(fid2))
         else
           tvuref2 := Link(ty1)
@@ -126,8 +126,8 @@ let typecheckConstructor (tyenv : TypeEnv) (rng : Range) (ctor : string) : Resul
             ref (Free(fid))
           bidMap.Add(bid, tvuref)
         ) Map.empty
-      let tyArgs = ctordef.ArgTypes |> List.map (instantiateByMap bidMap)
-      let tyRet = ctordef.MainType |> instantiateByMap bidMap
+      let tyArgs = ctordef.ArgTypes |> List.map (TypeConv.instantiateByMap bidMap)
+      let tyRet = ctordef.MainType |> TypeConv.instantiateByMap bidMap
       Ok(tyArgs, tyRet)
 
 
@@ -149,7 +149,7 @@ let rec typecheck (tyenv : TypeEnv) (e : Ast) : Result<MonoType, TypeError> =
   | Var(Ident(_, x)) ->
       match tyenv.TryFindValue(x) with
       | Some(pty) ->
-          let ty = instantiate pty
+          let ty = TypeConv.instantiate pty
           Ok(ty)
 
       | None ->
@@ -158,7 +158,7 @@ let rec typecheck (tyenv : TypeEnv) (e : Ast) : Result<MonoType, TypeError> =
   | Lambda(Ident(rngx, x), e0) ->
       let ty = freshMonoType rngx
       result {
-        let! ty0 = typecheck (tyenv.AddValue(x, lift ty)) e0
+        let! ty0 = typecheck (tyenv.AddValue(x, TypeConv.lift ty)) e0
         return (rng, FuncType(ty, ty0))
       }
 
@@ -174,18 +174,18 @@ let rec typecheck (tyenv : TypeEnv) (e : Ast) : Result<MonoType, TypeError> =
   | LetIn(Ident(rngx, x), e1, e2) ->
       result {
         let! ty1 = typecheck tyenv e1
-        let pty1 = generalize tyenv ty1
+        let pty1 = TypeConv.generalize tyenv ty1
         let! ty2 = typecheck (tyenv.AddValue(x, pty1)) e2
         return ty2
       }
 
   | LetRecIn(Ident(rngx, x), e1, e2) ->
       let ty = freshMonoType rngx
-      let tyenv = tyenv.AddValue(x, lift ty)
+      let tyenv = tyenv.AddValue(x, TypeConv.lift ty)
       result {
         let! ty1 = typecheck tyenv e1
         let! () = unify ty1 ty
-        let pty1 = generalize tyenv ty1
+        let pty1 = TypeConv.generalize tyenv ty1
         let! ty2 = typecheck tyenv e2
         return ty2
       }

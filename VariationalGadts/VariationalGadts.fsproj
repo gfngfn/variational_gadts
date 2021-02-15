@@ -8,6 +8,7 @@
   <ItemGroup>
     <Compile Include="MyUtil.fs" />
     <Compile Include="Syntax.fs" />
+    <Compile Include="TypeConv.fs" />
     <Compile Include="Parser.fs" />
     <Compile Include="TypeChecker.fs" />
     <Compile Include="Primitives.fs" />

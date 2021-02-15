@@ -38,7 +38,7 @@ f
       let! e = Parser.parse input |> Result.mapError (fun x -> ParseError(x))
       printfn "Expression: %O" e
       let! ty = TypeChecker.typecheck tyenv e |> Result.mapError (fun x -> TypeError(x))
-      printfn "Type: %s" (showMonoType ty)
+      printfn "Type: %s" (TypeConv.showMonoType ty)
       return ()
     }
   match res with
