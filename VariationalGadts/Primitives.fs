@@ -7,10 +7,6 @@ let dummy =
   DummyRange
 
 
-let (-->) ty1 ty2 =
-  (dummy, FuncType(ty1, ty2))
-
-
 let freshBoundType () =
   let bid = new BoundId()
   let pty = (dummy, TypeVar(Bound(bid)))
