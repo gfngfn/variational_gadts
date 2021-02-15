@@ -131,6 +131,46 @@ let generalize (tyenv : TypeEnv) (ty : MonoType) : PolyType =
   generalizeScheme genf ty
 
 
+let equalPoly (pty1 : PolyType) (pty2 : PolyType) : bool =
+  let bidDict = new Dictionary<BoundId, BoundId>()
+  let rec aux (_, pty1main) (_, pty2main) =
+    match (pty1main, pty2main) with
+    | (TypeVar(Mono(_)), _) | (_, TypeVar(Mono(_))) ->
+        false
+
+    | (TypeVar(Bound(bid1)), TypeVar(Bound(bid2))) ->
+        if bidDict.ContainsKey(bid1) then
+          bidDict.Item(bid1) = bid2
+        else
+          bidDict.Add(bid1, bid2)
+          true
+
+    | (DataType(dtid1, ptys1), DataType(dtid2, ptys2)) ->
+        if dtid1 = dtid2 then
+          auxList ptys1 ptys2
+        else
+          false
+
+    | (FuncType(pty11, pty12), FuncType(pty21, pty22)) ->
+        aux pty11 pty21 && aux pty12 pty22
+
+    | _ ->
+        false
+
+  and auxList ptys1 ptys2 =
+    try
+      List.fold2 (fun b pty1 pty2 ->
+        if b then
+          aux pty1 pty2
+        else
+          false
+      ) true ptys1 ptys2
+    with
+    | _ -> false
+  in
+  aux pty1 pty2
+
+
 type ParenRequirement =
   | Standalone
   | Codomain
