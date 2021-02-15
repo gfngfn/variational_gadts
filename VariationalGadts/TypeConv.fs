@@ -131,6 +131,51 @@ let generalize (tyenv : TypeEnv) (ty : MonoType) : PolyType =
   generalizeScheme genf ty
 
 
+let equalMono (ty1 : MonoType) (ty2 : MonoType) : bool =
+  let fidDict = new Dictionary<FreeId, FreeId>()
+  let rec aux ty1 ty2 =
+    let (_, ty1main) = ty1
+    let (_, ty2main) = ty2
+    match (ty1main, ty2main) with
+    | (TypeVar(Updatable{contents = Link(ty1sub)}), _) ->
+        aux ty1sub ty2
+
+    | (_, TypeVar(Updatable{contents = Link(ty2sub)})) ->
+        aux ty1 ty2sub
+
+    | (TypeVar(Updatable{contents = Free(fid1)}), TypeVar(Updatable{contents = Free(fid2)})) ->
+        if fidDict.ContainsKey(fid1) then
+          fidDict.Item(fid1) = fid2
+        else
+          fidDict.Add(fid1, fid2)
+          true
+
+    | (DataType(dtid1, tys1), DataType(dtid2, tys2)) ->
+        if dtid1 = dtid2 then
+          auxList tys1 tys2
+        else
+          false
+
+    | (FuncType(ty11, ty12), FuncType(ty21, ty22)) ->
+        aux ty11 ty21 && aux ty12 ty22
+
+    | _ ->
+        false
+
+  and auxList tys1 tys2 =
+    try
+      List.fold2 (fun b ty1 ty2 ->
+        if b then
+          aux ty1 ty2
+        else
+          false
+      ) true tys1 tys2
+    with
+    | _ -> false
+  in
+  aux ty1 ty2
+
+
 let equalPoly (pty1 : PolyType) (pty2 : PolyType) : bool =
   let bidDict = new Dictionary<BoundId, BoundId>()
   let rec aux (_, pty1main) (_, pty2main) =

@@ -217,3 +217,6 @@ let intType rng =
 
 let listType rng ty =
   (rng, DataType(ListTypeId, [ty]))
+
+let (-->) ty1 ty2 =
+  (DummyRange, FuncType(ty1, ty2))
