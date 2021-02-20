@@ -200,12 +200,12 @@ and typecheckValueBinding (tyenv : TypeEnv) (valbind : ValueBinding) : Result<Ty
 
   | Rec(Ident(rngx, x), e1) ->
       let ty = freshMonoType rngx
-      let tyenv = tyenv.AddValue(x, TypeConv.lift ty)
+      let tyenvSub = tyenv.AddValue(x, TypeConv.lift ty)
       result {
-        let! ty1 = typecheck tyenv e1
+        let! ty1 = typecheck tyenvSub e1
         let! () = unify ty1 ty
         let pty1 = TypeConv.generalize tyenv ty1
-        return tyenv
+        return tyenv.AddValue(x, pty1)
       }
 
 
