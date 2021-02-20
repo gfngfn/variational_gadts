@@ -23,10 +23,14 @@ f
   let tyenv = Primitives.initialTypeEnvironment
   let res =
     result {
-      let! e = Parser.parse input |> Result.mapError (fun x -> ParseError(x))
-      printfn "Expression: %O" e
-      let! ty = TypeChecker.typecheck tyenv e |> Result.mapError (fun x -> TypeError(x))
-      printfn "Type: %s" (TypeConv.showMonoType ty)
+      let! binds = Parser.parse input |> Result.mapError (fun x -> ParseError(x))
+      printfn "Bindings: %O" binds
+      let! tyenv = TypeChecker.typecheckBindingList tyenv binds |> Result.mapError (fun x -> TypeError(x))
+      tyenv.FoldValue(
+        begin fun () x pty ->
+          printfn "val %s : %s" x (TypeConv.showPolyType pty)
+        end,
+        ())
       return ()
     }
   match res with

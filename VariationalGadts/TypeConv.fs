@@ -228,30 +228,64 @@ let showBaseType = function
   | ListTypeId -> "list"
 
 
-let showMonoType (ty : MonoType) =
-  let rec aux (parenReq : ParenRequirement) (ty : MonoType) =
-    let (_, tyMain) = ty
-    match tyMain with
-    | TypeVar(Updatable(tvuref)) ->
-        match !tvuref with
-        | Free(fid)   -> fid.ToString()
-        | Link(tysub) -> aux parenReq tysub
+let rec showMonoTypeAux (parenReq : ParenRequirement) (ty : MonoType) =
+  let aux = showMonoTypeAux
+  let (_, tyMain) = ty
+  match tyMain with
+  | TypeVar(Updatable(tvuref)) ->
+      match !tvuref with
+      | Free(fid)   -> fid.ToString()
+      | Link(tysub) -> aux parenReq tysub
 
-    | DataType(dtid, tys) ->
-        let s = showBaseType dtid in
-        match tys with
-        | [] ->
-            s
+  | DataType(dtid, tys) ->
+      let s = showBaseType dtid in
+      match tys with
+      | [] ->
+          s
 
-        | _ :: _ ->
-            let sargs = tys |> List.map (aux Standalone) |> String.concat " "
-            sprintf "%s %s" s sargs
+      | _ :: _ ->
+          let sargs = tys |> List.map (aux Standalone) |> String.concat " "
+          sprintf "%s %s" s sargs
 
-    | FuncType(ty1, ty2) ->
-        let s1 = aux Standalone ty1
-        let s2 = aux Codomain ty2
-        match parenReq with
-        | Standalone -> sprintf "(%s -> %s)" s1 s2
-        | Codomain   -> sprintf "%s -> %s" s1 s2
-  in
-  aux Codomain ty
+  | FuncType(ty1, ty2) ->
+      let s1 = aux Standalone ty1
+      let s2 = aux Codomain ty2
+      match parenReq with
+      | Standalone -> sprintf "(%s -> %s)" s1 s2
+      | Codomain   -> sprintf "%s -> %s" s1 s2
+
+
+let showMonoType =
+  showMonoTypeAux Codomain
+
+
+let rec showPolyTypeAux (parenReq : ParenRequirement) (pty : PolyType) =
+  let aux = showPolyTypeAux
+  let (_, ptyMain) = pty
+  match ptyMain with
+  | TypeVar(Mono(tvuref)) ->
+      showMonoTypeAux parenReq (DummyRange, TypeVar(tvuref))
+
+  | TypeVar(Bound(bid)) ->
+      bid.ToString()
+
+  | DataType(dtid, tys) ->
+      let s = showBaseType dtid in
+      match tys with
+      | [] ->
+          s
+
+      | _ :: _ ->
+          let sargs = tys |> List.map (aux Standalone) |> String.concat " "
+          sprintf "%s %s" s sargs
+
+  | FuncType(pty1, pty2) ->
+       let s1 = aux Standalone pty1
+       let s2 = aux Codomain pty2
+       match parenReq with
+       | Standalone -> sprintf "(%s -> %s)" s1 s2
+       | Codomain   -> sprintf "%s -> %s" s1 s2
+
+
+let showPolyType =
+  showPolyTypeAux Codomain

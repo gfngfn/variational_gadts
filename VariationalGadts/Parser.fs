@@ -26,6 +26,7 @@ let identifierParser s =
     let isIdentifierFirstChar c = isLetter c
     let isIdentifierChar c = isLetter c || isDigit c || c = '_'
     many1Satisfy2L isIdentifierFirstChar isIdentifierChar "identifier" >>= begin function
+    | "val"
     | "fun"
     | "let" | "in" | "rec"
     | "if" | "then" | "else"
@@ -109,7 +110,12 @@ and bottomLevelParser s =
   p s
 
 
-let parse (s : string) : Result<Ast, ParseError> =
-  match run (spaces >>. absLevelParser) s with
-  | Success(e, _, _)   -> Result.Ok(e)
+let bindingParser s =
+  let pValBind = pstring "val" .>> spaces >>. valueBindingParser |>> (fun valbind -> BindValue(valbind))
+  pValBind s
+
+
+let parse (s : string) : Result<Binding list, ParseError> =
+  match run (spaces >>. many bindingParser) s with
+  | Success(binds, _, _)   -> Result.Ok(binds)
   | Failure(msg, _, _) -> Result.Error(msg)
