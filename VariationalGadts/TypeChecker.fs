@@ -252,27 +252,26 @@ let typecheckBinding (tyenv : TypeEnv) (bind : Binding) : Result<TypeEnv, TypeEr
   | BindValue(valbind) ->
       typecheckValueBinding tyenv valbind
 
-  | BindType(tybind) ->
-      let (tyident, tyvars, ctorbrs) = tybind
+  | BindType(Generalized(tyident, arity, gctorbrs)) ->
       let dtid = new DataTypeId(tyident)
-      let tyenv = tyenv.AddType(tyident, dtid, List.length tyvars)
-      let (tyenv, bidacc) : TypeEnv * Alist<BoundId> =
-        tyvars |> List.fold (fun (tyenv, bidacc) tyvar ->
-          let bid = new BoundId()
-          (tyenv.AddTypeVariable(tyvar, bid), bidacc.Extend(bid))
-        ) (tyenv, new Alist<BoundId>())
-      let bids = bidacc.ToList()
-      let typarams = bids |> List.map (fun bid -> (DummyRange, TypeVar(Bound(bid))))
-      ctorbrs |> List.fold (fun res ctorbr ->
-        match ctorbr with
-        | ConstructorBranch(Ctor(_, ctor), mtys) ->
+      let tyenv = tyenv.AddType(tyident, dtid, arity)
+      gctorbrs |> List.fold (fun res gctorbr ->
+        match gctorbr with
+        | GeneralizedConstructorBranch(Ctor(_, ctor), tyvars, mtys) ->
             result {
               let! tyenv = res
+              let (tyenvSub, bidacc) : TypeEnv * Alist<BoundId> =
+                tyvars |> List.fold (fun (tyenvSub, bidacc) tyvar ->
+                  let bid = new BoundId()
+                  (tyenvSub.AddTypeVariable(tyvar, bid), bidacc.Extend(bid))
+                ) (tyenv, new Alist<BoundId>())
+              let bids = bidacc.ToList()
+              let typarams = bids |> List.map (fun bid -> (DummyRange, TypeVar(Bound(bid))))
               let! ptyacc =
                 mtys |> List.fold (fun (res : Result<Alist<PolyType>, TypeError>) mty ->
                   result {
                     let! ptyacc = res
-                    let! pty = decodeManualType tyenv mty
+                    let! pty = decodeManualType tyenvSub mty
                     return ptyacc.Extend(pty)
                   }
                 ) (Ok(new Alist<PolyType>()))

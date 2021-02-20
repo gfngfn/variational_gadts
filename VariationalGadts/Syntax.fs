@@ -97,12 +97,12 @@ and ValueBinding =
     | Rec(i, e1)    -> sprintf "Rec(%O, %O)" i e1
 
 
-type ConstructorBranch =
-  | ConstructorBranch of Constructor * ManualType list
+type GeneralizedConstructorBranch =
+  | GeneralizedConstructorBranch of Constructor * ManualTypeVar list * ManualType list
 
 
 type TypeBinding =
-  TypeIdent * ManualTypeVar list * ConstructorBranch list
+  Generalized of TypeIdent * int * GeneralizedConstructorBranch list
 
 
 type Binding =

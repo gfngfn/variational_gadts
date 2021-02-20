@@ -127,8 +127,20 @@ and constructorApplicationParser s =
   p s
 
 
+let generalizedConstructorBranchParser s =
+  failwith "TODO: generalizedConstructorBranchParser"
+
+
+let typeBindingParser s =
+  let pIdent = (identifierParser .>> spaces) |>> function Ident(_, tyident) -> tyident
+  let pBranches = pstring "=" .>> spaces >>. many generalizedConstructorBranchParser
+  let p = pipe3 pIdent integerParser pBranches (fun tyident (_, arity) gctorbrs -> Generalized(tyident, arity, gctorbrs))
+  p s
+
+
 let bindingParser s =
   let pValBind = pstring "val" .>> spaces >>. valueBindingParser |>> (fun valbind -> BindValue(valbind))
+  let pTyBind = pstring "type" .>> spaces >>. typeBindingParser |>> (fun tybind -> BindType(tybind))
   pValBind s
 
 
