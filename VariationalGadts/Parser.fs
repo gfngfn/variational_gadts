@@ -21,11 +21,16 @@ let withRange (p : Parser<'r, 'u>) : Parser<Range * 'r, 'u> =
   pipe3 getPosition p getPosition (fun posL v posR -> (ValidRange(posL, posR), v))
 
 
+let lowerParser s =
+  let isIdentifierFirstChar c = isLower c
+  let isIdentifierChar c = isLetter c || isDigit c || c = '_'
+  let p = many1Satisfy2L isIdentifierFirstChar isIdentifierChar "identifier"
+  p s
+
+
 let identifierParser s =
   let pMain =
-    let isIdentifierFirstChar c = isLower c
-    let isIdentifierChar c = isLetter c || isDigit c || c = '_'
-    many1Satisfy2L isIdentifierFirstChar isIdentifierChar "identifier" >>= begin function
+    lowerParser >>= begin function
     | "val"
     | "fun"
     | "let" | "in" | "rec"
@@ -46,6 +51,11 @@ let constructorParser s =
     let isConstructorChar c = isLetter c || isDigit c || c = '_'
     many1Satisfy2L isConstructorFirstChar isConstructorChar "constructor"
   let p = withRange pMain |>> (fun (r, s) -> Ctor(r, s))
+  p s
+
+
+let typeVariableParser s =
+  let p = pstring "'" >>. lowerParser
   p s
 
 
@@ -127,8 +137,40 @@ and constructorApplicationParser s =
   p s
 
 
+let rec typeParser s =
+  let p : Parser<ManualType, 'u> = arrowLevelTypeParser <|> appLevelTypeParser <|> bottomLevelTypeParser
+  p s
+
+
+and arrowLevelTypeParser s =
+  let pMain : Parser<ManualType * ManualType, 'u> =
+    appLevelTypeParser .>> (pstring "->" .>> spaces) .>>. arrowLevelTypeParser
+  let p = withRange (pMain |>> fun (mnty1, mnty2) -> MFuncType(mnty1, mnty2))
+  p s
+
+
+and appLevelTypeParser s =
+  let p1 = identifierParser |>> function Ident(_, tyident) -> tyident
+  let p2 = many1 bottomLevelTypeParser
+  let p : Parser<ManualType, 'u> = withRange (pipe2 p1 p2 (fun tyident mntys -> MDataType(tyident, mntys)))
+  p s
+
+
+and bottomLevelTypeParser s =
+  let pTyVar = withRange (typeVariableParser |>> fun s -> MTypeVar(s))
+  let pTy = withRange (identifierParser |>> function Ident(_, tyident) -> MDataType(tyident, []))
+  let pParen = between (pstring "(" .>> spaces) (pstring ")") typeParser
+  let p : Parser<ManualType, 'u> = (pTyVar <|> pTy <|> pParen) .>> spaces
+  p s
+
+
 let generalizedConstructorBranchParser s =
-  failwith "TODO: generalizedConstructorBranchParser"
+  let pBar = pstring "|" .>> spaces
+  let pCtor = constructorParser .>> spaces
+  let pTyVars : Parser<ManualTypeVar list, 'u> = many (typeVariableParser .>> spaces)
+  let pParamTys = between (pstring "(" .>> spaces) (pstring ")" .>> spaces) (many typeParser)
+  let p = pipe3 (pBar >>. pCtor) pTyVars pParamTys (fun ctor tyvars mntys -> GeneralizedConstructorBranch(ctor, tyvars, mntys))
+  p s
 
 
 let typeBindingParser s =
