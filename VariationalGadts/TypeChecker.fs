@@ -221,6 +221,7 @@ let typecheckBinding (tyenv : TypeEnv) (bind : Binding) : Result<TypeEnv, TypeEr
   | BindType(tybind) ->
       let (tyident, tyvars, ctorbrs) = tybind
       let dtid = new DataTypeId(tyident)
+      let tyenv = tyenv.AddType(tyident, dtid, List.length tyvars)
       let (tyenv, bidacc) : TypeEnv * Alist<BoundId> =
         tyvars |> List.fold (fun (tyenv, bidacc) tyvar ->
           let bid = new BoundId()

@@ -231,6 +231,7 @@ type TypeEnv =
     Vars   : Map<string, PolyType>;
     Ctors  : Map<Constructor, ConstructorDef>;
     TyVars : Map<ManualTypeVar, BoundId>;
+    Types  : Map<TypeIdent, DataTypeId * int>;
   }
 
   static member empty =
@@ -238,6 +239,7 @@ type TypeEnv =
       Vars   = Map.empty;
       Ctors  = Map.empty;
       TyVars = Map.empty;
+      Types  = Map.empty;
     }
 
   member this.FoldValue(f, init) =
@@ -260,6 +262,12 @@ type TypeEnv =
 
   member this.FindTypeVariable(tyvar) =
     this.TyVars.TryFind(tyvar)
+
+  member this.AddType(tyident, dtid, arity) =
+    { this with Types = this.Types.Add(tyident, (dtid, arity)) }
+
+  member this.TryFindType(tyident) =
+    this.Types.TryFind(tyident)
 
 
 let unitTypeId = new DataTypeId("unit")
