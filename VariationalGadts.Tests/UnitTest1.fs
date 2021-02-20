@@ -47,3 +47,15 @@ let Test1 () =
     let tyB = TypeChecker.freshMonoType DummyRange
     (tyA --> (tyB --> tyA)) --> (tyA --> (listType DummyRange tyB --> tyA))
   Assert.IsTrue(check input2 tyExpect2)
+
+  let input3 =
+    """
+    let f = fun b -> fun x -> fun y ->
+      if b then x else y
+    in
+    f
+    """
+  let tyExpect3 =
+    let tyA = TypeChecker.freshMonoType DummyRange
+    (boolType DummyRange --> (tyA --> (tyA --> tyA)))
+  Assert.IsTrue(check input3 tyExpect3)

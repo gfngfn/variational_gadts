@@ -14,18 +14,6 @@ type ProgramError =
 
 [<EntryPoint>]
 let main argv =
-(*
-  let input = "let apply = fun x -> fun y -> x 0 (cons y []) in apply"
-*)
-(*
-  let input = """
-let rec foldl = fun f -> fun acc -> fun xs ->
-  decompose_list xs
-    (fun u -> acc)
-    (fun y -> fun ys -> foldl f (f acc y) ys)
-in
-foldl"""
-*)
   let input = """
 let f = fun b -> fun x -> fun y ->
   if b then x else y
