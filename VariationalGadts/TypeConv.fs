@@ -221,11 +221,8 @@ type ParenRequirement =
   | Codomain
 
 
-let showBaseType = function
-  | UnitTypeId -> "unit"
-  | BoolTypeId -> "bool"
-  | IntTypeId  -> "int"
-  | ListTypeId -> "list"
+let showBaseType (dtid : DataTypeId) =
+  dtid.Name
 
 
 let rec showMonoTypeAux (parenReq : ParenRequirement) (ty : MonoType) =

@@ -124,11 +124,27 @@ type BoundId private(n : int) =
       | _                   -> invalidArg "obj" "not of type BoundId"
 
 
-type DataTypeId =
-  | UnitTypeId
-  | BoolTypeId
-  | IntTypeId
-  | ListTypeId
+type DataTypeId private(n : int, s : string) =
+  static let mutable current = 0
+
+  new(name : string) =
+    current <- current + 1
+    new DataTypeId(current, name)
+
+  member this.Number = n
+
+  member this.Name = s
+
+  override this.ToString() =
+    sprintf "DT%d" n
+
+  override this.GetHashCode() =
+    this.Number.GetHashCode()
+
+  override this.Equals(obj : obj) =
+    match obj with
+    | :? DataTypeId as other -> this.Number = other.Number
+    | _                      -> invalidArg "obj" "not of type BoundId"
 
 
 type Type<'a> =
@@ -215,20 +231,27 @@ type TypeEnv =
     this.Ctors.TryFind(ctor)
 
 
+let unitTypeId = new DataTypeId("unit")
+let boolTypeId = new DataTypeId("bool")
+let intTypeId  = new DataTypeId("int")
+let listTypeId = new DataTypeId("list")
+
+
 let unitType rng =
-  (rng, DataType(UnitTypeId, []))
+  (rng, DataType(unitTypeId, []))
 
 
 let boolType rng =
-  (rng, DataType(BoolTypeId, []))
+  (rng, DataType(boolTypeId, []))
 
 
 let intType rng =
-  (rng, DataType(IntTypeId, []))
+  (rng, DataType(intTypeId, []))
 
 
 let listType rng ty =
-  (rng, DataType(ListTypeId, [ty]))
+  (rng, DataType(listTypeId, [ty]))
+
 
 let (-->) ty1 ty2 =
   (DummyRange, FuncType(ty1, ty2))
