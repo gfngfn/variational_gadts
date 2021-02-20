@@ -7,11 +7,15 @@ open Syntax
 
 
 type TypeError =
-  | UnboundVariable of Range * string
-  | UnboundConstructor of Range * Constructor
-  | Inclusion       of FreeId * MonoType * MonoType
-  | Contradiction   of MonoType * MonoType
-  | ArityMismatch   of Range * int * int
+  | UnboundVariable     of Range * string
+  | UnboundConstructor  of Range * string
+  | UnboundTypeVariable of Range * ManualTypeVar
+  | UnboundTypeIdent    of Range * TypeIdent
+  | InvalidArityOfType  of Range * TypeIdent * int * int
+  | InvalidTypeNameForConstructorBranch of Range * TypeIdent * TypeIdent
+  | Inclusion           of FreeId * MonoType * MonoType
+  | Contradiction       of MonoType * MonoType
+  | ArityMismatch       of Range * int * int
 
 
 type UnificationError =
@@ -113,7 +117,7 @@ let typecheckBaseConstant (rng : Range) (bc : BaseConstant) =
   | IntegerValue(_) -> intType rng
 
 
-let typecheckConstructor (tyenv : TypeEnv) (rng : Range) (ctor : string) : Result<MonoType list * MonoType, TypeError> =
+let typecheckConstructor (tyenv : TypeEnv) (Ctor(rng, ctor) : Constructor) : Result<MonoType list * MonoType, TypeError> =
   match tyenv.TryFindConstructor(ctor) with
   | None ->
       Error(UnboundConstructor(rng, ctor))
@@ -131,6 +135,41 @@ let typecheckConstructor (tyenv : TypeEnv) (rng : Range) (ctor : string) : Resul
       Ok(tyArgs, tyRet)
 
 
+let rec decodeManualType (tyenv : TypeEnv) (mnty : ManualType) : Result<PolyType, TypeError> =
+  let aux = decodeManualType tyenv
+  let (rng, mntyMain) = mnty
+  match mntyMain with
+  | MTypeVar(tyvar) ->
+      match tyenv.TryFindTypeVariable(tyvar) with
+      | None ->
+          Error(UnboundTypeVariable(rng, tyvar))
+
+      | Some(bid) ->
+          Ok((rng, TypeVar(Bound(bid))))
+
+  | MDataType(tyident, mntys) ->
+      match tyenv.TryFindType(tyident) with
+      | None ->
+          Error(UnboundTypeIdent(rng, tyident))
+
+      | Some((dtid, arityExpect)) ->
+          let arityGot = List.length mntys
+          if arityExpect = arityGot then
+            result {
+              let! ptys = mntys |> List.mapM aux
+              return (rng, DataType(dtid, ptys))
+            }
+          else
+            Error(InvalidArityOfType(rng, tyident, arityExpect, arityGot))
+
+  | MFuncType(mnty1, mnty2) ->
+      result {
+        let! pty1 = aux mnty1
+        let! pty2 = aux mnty2
+        return (rng, FuncType(pty1, pty2))
+      }
+
+
 let rec typecheck (tyenv : TypeEnv) (e : Ast) : Result<MonoType, TypeError> =
   let (rng, eMain) = e in
   match eMain with
@@ -140,7 +179,7 @@ let rec typecheck (tyenv : TypeEnv) (e : Ast) : Result<MonoType, TypeError> =
 
   | Constructor(ctor, es) ->
       result {
-        let! (tysExpected, tyRes) = typecheckConstructor tyenv rng ctor
+        let! (tysExpected, tyRes) = typecheckConstructor tyenv ctor
         let! tysGiven = es |> List.mapM (typecheck tyenv)
         let! () = unifyList rng tysGiven tysExpected
         return tyRes
@@ -213,6 +252,46 @@ let typecheckBinding (tyenv : TypeEnv) (bind : Binding) : Result<TypeEnv, TypeEr
   match bind with
   | BindValue(valbind) ->
       typecheckValueBinding tyenv valbind
+
+  | BindType(Generalized(tyident, arity, gctorbrs)) ->
+      let dtid = new DataTypeId(tyident)
+      let tyenv = tyenv.AddType(tyident, dtid, arity)
+      gctorbrs |> List.fold (fun res gctorbr ->
+        match gctorbr with
+        | GeneralizedConstructorBranch(Ctor(rng, ctor), tyvars, mtys, tyidentDummy, mtyretargs) ->
+            result {
+              let! () =
+                if tyident = tyidentDummy then
+                  Ok(())
+                else
+                  Error(InvalidTypeNameForConstructorBranch(rng, tyident, tyidentDummy))
+              let! tyenv = res
+              let (tyenvSub, bidacc) : TypeEnv * Alist<BoundId> =
+                tyvars |> List.fold (fun (tyenvSub, bidacc) tyvar ->
+                  let bid = new BoundId()
+                  (tyenvSub.AddTypeVariable(tyvar, bid), bidacc.Extend(bid))
+                ) (tyenv, new Alist<BoundId>())
+              let bids = bidacc.ToList()
+              let! tyretargs =
+                mtyretargs |> List.mapM (fun mty ->
+                  decodeManualType tyenvSub mty
+                )
+              let! ptyacc =
+                mtys |> List.foldM (fun (ptyacc : Alist<PolyType>) mty ->
+                  result {
+                    let! pty = decodeManualType tyenvSub mty
+                    return ptyacc.Extend(pty)
+                  }
+                ) (Ok(new Alist<PolyType>()))
+              let ctordef =
+                {
+                  BoundIds = bids;
+                  MainType = (DummyRange, DataType(dtid, tyretargs));
+                  ArgTypes = ptyacc.ToList();
+                }
+              return tyenv.AddConstructor(ctor, ctordef)
+            }
+      ) (Ok(tyenv))
 
 
 let typecheckBindingList (tyenv : TypeEnv) (binds : Binding list) : Result<TypeEnv, TypeError> =

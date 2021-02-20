@@ -31,6 +31,24 @@ type Ident =
     | Ident(r, x) -> sprintf "Ident(%O, \"%s\")" r x
 
 
+type TypeIdent =
+  string
+
+
+type ManualTypeVar =
+  string
+
+
+type ManualType =
+  Range * ManualTypeMain
+
+
+and ManualTypeMain =
+  | MTypeVar  of ManualTypeVar
+  | MDataType of TypeIdent * ManualType list
+  | MFuncType of ManualType * ManualType
+
+
 type BaseConstant =
   | UnitValue
   | BooleanValue of bool
@@ -38,7 +56,11 @@ type BaseConstant =
 
 
 type Constructor =
-  string
+  | Ctor of Range * string
+
+  override this.ToString() =
+    match this with
+    | Ctor(r, s) -> sprintf "Ctor(%O, \"%s\")" r s
 
 
 type Ast =
@@ -62,7 +84,7 @@ and AstMain =
     | LocalBinding(bind, e)  -> sprintf "LocalBinding(%O, %O)" bind e
     | IfThenElse(e0, e1, e2) -> sprintf "IfThenElse(%O, %O, %O)" e0 e1 e2
     | BaseConstant(bc)       -> sprintf "BaseConstant(%O)" bc
-    | Constructor(ctor, es)  -> sprintf "Constructor(%s, %O)" ctor es
+    | Constructor(Ctor(_, s), es) -> sprintf "Constructor(%s, %O)" s es
 
 
 and ValueBinding =
@@ -75,8 +97,17 @@ and ValueBinding =
     | Rec(i, e1)    -> sprintf "Rec(%O, %O)" i e1
 
 
+type GeneralizedConstructorBranch =
+  | GeneralizedConstructorBranch of Constructor * ManualTypeVar list * ManualType list * TypeIdent * ManualType list
+
+
+type TypeBinding =
+  Generalized of TypeIdent * int * GeneralizedConstructorBranch list
+
+
 type Binding =
   | BindValue of ValueBinding
+  | BindType  of TypeBinding
 
 
 type FreeId private(n : int) =
@@ -124,11 +155,27 @@ type BoundId private(n : int) =
       | _                   -> invalidArg "obj" "not of type BoundId"
 
 
-type DataTypeId =
-  | UnitTypeId
-  | BoolTypeId
-  | IntTypeId
-  | ListTypeId
+type DataTypeId private(n : int, s : string) =
+  static let mutable current = 0
+
+  new(name : string) =
+    current <- current + 1
+    new DataTypeId(current, name)
+
+  member this.Number = n
+
+  member this.Name = s
+
+  override this.ToString() =
+    sprintf "DT%d" n
+
+  override this.GetHashCode() =
+    this.Number.GetHashCode()
+
+  override this.Equals(obj : obj) =
+    match obj with
+    | :? DataTypeId as other -> this.Number = other.Number
+    | _                      -> invalidArg "obj" "not of type BoundId"
 
 
 type Type<'a> =
@@ -189,18 +236,28 @@ type ConstructorDef =
 
 type TypeEnv =
   private {
-    Vars : Map<string, PolyType>;
-    Ctors : Map<Constructor, ConstructorDef>
+    Vars   : Map<string, PolyType>;
+    Ctors  : Map<string, ConstructorDef>;
+    TyVars : Map<ManualTypeVar, BoundId>;
+    Types  : Map<TypeIdent, DataTypeId * int>;
   }
 
   static member empty =
     {
-      Vars = Map.empty;
-      Ctors = Map.empty;
+      Vars   = Map.empty;
+      Ctors  = Map.empty;
+      TyVars = Map.empty;
+      Types  = Map.empty;
     }
 
   member this.FoldValue(f, init) =
     this.Vars |> Map.fold f init
+
+  member this.FoldConstructor(f, init) =
+    this.Ctors |> Map.fold f init
+
+  member this.FoldType(f, init) =
+    this.Types |> Map.fold f init
 
   member this.TryFindValue(x) =
     this.Vars.TryFind(x)
@@ -214,21 +271,40 @@ type TypeEnv =
   member this.TryFindConstructor(ctor) =
     this.Ctors.TryFind(ctor)
 
+  member this.AddTypeVariable(tyvar, bid) =
+    { this with TyVars = this.TyVars.Add(tyvar, bid) }
+
+  member this.TryFindTypeVariable(tyvar) =
+    this.TyVars.TryFind(tyvar)
+
+  member this.AddType(tyident, dtid, arity) =
+    { this with Types = this.Types.Add(tyident, (dtid, arity)) }
+
+  member this.TryFindType(tyident) =
+    this.Types.TryFind(tyident)
+
+
+let unitTypeId = new DataTypeId("unit")
+let boolTypeId = new DataTypeId("bool")
+let intTypeId  = new DataTypeId("int")
+let listTypeId = new DataTypeId("list")
+
 
 let unitType rng =
-  (rng, DataType(UnitTypeId, []))
+  (rng, DataType(unitTypeId, []))
 
 
 let boolType rng =
-  (rng, DataType(BoolTypeId, []))
+  (rng, DataType(boolTypeId, []))
 
 
 let intType rng =
-  (rng, DataType(IntTypeId, []))
+  (rng, DataType(intTypeId, []))
 
 
 let listType rng ty =
-  (rng, DataType(ListTypeId, [ty]))
+  (rng, DataType(listTypeId, [ty]))
+
 
 let (-->) ty1 ty2 =
   (DummyRange, FuncType(ty1, ty2))

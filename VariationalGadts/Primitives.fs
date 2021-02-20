@@ -35,7 +35,7 @@ let primitiveValues : (string * PolyType) list =
   ]
 
 
-let primitiveConstructors : (Constructor * ConstructorDef) list =
+let primitiveConstructors : (string * ConstructorDef) list =
   [
     begin
       let (bid, pty) = freshBoundType ()

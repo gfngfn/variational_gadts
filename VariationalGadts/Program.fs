@@ -15,10 +15,12 @@ type ProgramError =
 [<EntryPoint>]
 let main argv =
   let input = """
-let f = fun b -> fun x -> fun y ->
+val f = fun b -> fun x -> fun y ->
   if b then x else y
-in
-f
+
+type ast :: 1 =
+  | App 'a 'b (ast ('a -> 'b), ast 'a) : ast 'b
+  | Const 'a  ('a)                     : ast 'a
 """
   let tyenv = Primitives.initialTypeEnvironment
   let res =
@@ -31,6 +33,21 @@ f
           printfn "val %s : %s" x (TypeConv.showPolyType pty)
         end,
         ())
+      tyenv.FoldType(
+        begin fun () t (_, arity) ->
+          printfn "type %s :: %d" t arity
+        end,
+        ()
+      )
+      tyenv.FoldConstructor(
+        begin fun () ctor ctordef ->
+          printfn "%s (%s) : %s"
+            ctor
+            (String.concat ", " (List.map TypeConv.showPolyType ctordef.ArgTypes))
+            (TypeConv.showPolyType ctordef.MainType)
+        end,
+        ()
+      )
       return ()
     }
   match res with

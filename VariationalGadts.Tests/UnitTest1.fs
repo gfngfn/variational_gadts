@@ -6,10 +6,10 @@ open MyUtil
 open Syntax
 
 
-let findValue (x : string) (tyenv : TypeEnv) : Result<PolyType, unit> =
+let findValue (x : string) (tyenv : TypeEnv) : Result<PolyType, string> =
   match tyenv.TryFindValue(x) with
   | Some(pty) -> Ok(pty)
-  | None      -> Error(())
+  | None      -> Error(sprintf "findValue: %s not found" x)
 
 
 let freshPolyType () =
@@ -18,12 +18,19 @@ let freshPolyType () =
   (rng, TypeVar(Bound(bid)))
 
 
-let check (input : string) (x : string) (ptyExpect : PolyType) =
+let checkMain (input : string) : Result<TypeEnv, string> =
   let tyenv = Primitives.initialTypeEnvironment
+  result {
+    let! binds = Parser.parse input |> Result.mapError (sprintf "parse error: %s")
+    let! tyenv = TypeChecker.typecheckBindingList tyenv binds |> Result.mapError (sprintf "type error: %O")
+    return tyenv
+  }
+
+
+let check (input : string) (x : string) (ptyExpect : PolyType) =
   let res =
     result {
-      let! binds = Parser.parse input |> Result.mapError (fun _ -> ())
-      let! tyenv = TypeChecker.typecheckBindingList tyenv binds |> Result.mapError (fun _ -> ())
+      let! tyenv = checkMain input
       let! ptyGot = findValue x tyenv
       return ptyGot
     }
@@ -32,7 +39,21 @@ let check (input : string) (x : string) (ptyExpect : PolyType) =
       let sExpect = TypeConv.showPolyType ptyExpect
       let sGot = TypeConv.showPolyType ptyGot
       (TypeConv.equalPoly ptyGot ptyExpect, sprintf "expected: %s, got: %s" sExpect sGot)
-  | Error(err) -> (false, sprintf "error: %O" err)
+
+  | Error(errmsg) ->
+      (false, errmsg)
+
+
+let parse (input : string) =
+  match Parser.parse input with
+  | Ok(_)      -> (true, "")
+  | Error(msg) -> (false, msg)
+
+
+let pass (input : string) =
+  match checkMain input with
+  | Ok(_)      -> (true, "")
+  | Error(msg) -> (false, msg)
 
 
 [<SetUp>]
@@ -74,7 +95,7 @@ let ``typing foldl`` () =
 
 
 [<Test>]
-let ``typing conditionals`` () =
+let ``typing a conditional expression`` () =
   let input =
     """
     val f = fun b -> fun x -> fun y ->
@@ -85,4 +106,27 @@ let ``typing conditionals`` () =
     let ptyA = freshPolyType ()
     (boolType DummyRange --> (ptyA --> (ptyA --> ptyA)))
   let (b, msg) = check input ident ptyExpect
+  Assert.IsTrue(b, msg)
+
+
+[<Test>]
+let ``parsing a type binding 1`` () =
+  let input =
+    """
+    type result :: 1 =
+      | Ok    'v 'e ('v) : result 'v 'e
+      | Error 'v 'e ('e) : result 'v 'e
+    """
+  let (b, msg) = pass input
+  Assert.IsTrue(b, msg)
+
+[<Test>]
+let ``parsing a type binding 2`` () =
+  let input =
+    """
+    type ast :: 1 =
+      | App 'a 'b (ast ('a -> 'b), ast 'a) : ast 'b
+      | Const 'a  ('a)                     : ast 'a
+    """
+  let (b, msg) = pass input
   Assert.IsTrue(b, msg)
