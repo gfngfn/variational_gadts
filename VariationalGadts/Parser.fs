@@ -52,7 +52,7 @@ let identifierToken : Parser<Ident, unit> =
   attempt p
 
 
-let constructorParser : Parser<Constructor, unit> =
+let constructorToken : Parser<Constructor, unit> =
   let pMain =
     let isConstructorFirstChar c = isUpper c
     let isConstructorChar c = isLetter c || isDigit c || c = '_'
@@ -60,11 +60,11 @@ let constructorParser : Parser<Constructor, unit> =
   withRange pMain |>> (fun (r, s) -> Ctor(r, s))
 
 
-let typeVariableParser : Parser<ManualTypeVar, unit> =
+let typeVariableToken : Parser<ManualTypeVar, unit> =
   pstring "'" >>. lowerToken
 
 
-let integerParser : Parser<Range * int, unit> =
+let integerToken : Parser<Range * int, unit> =
   withRange (many1Satisfy isDigit |>> int)
 
 
@@ -136,7 +136,7 @@ and bottomLevelParser : Parser<Ast, unit> =
   let pTrue = withRange (pstring "true" |>> fun _ -> BaseConstant(BooleanValue(true)))
   let pFalse = withRange (pstring "false" |>> fun _ -> BaseConstant(BooleanValue(false)))
   let pUnitConst = withRange (pstring "()" |>> fun _ -> BaseConstant(UnitValue))
-  let pIntConst = integerParser |>> fun (r, n) -> (r, BaseConstant(IntegerValue(n)))
+  let pIntConst = integerToken |>> fun (r, n) -> (r, BaseConstant(IntegerValue(n)))
   let pParen = enclose absLevelParser
   let p = ((pIdent <|> pNil <|> pTrue <|> pFalse <|> pUnitConst <|> pIntConst) .>> spaces) <|> pParen <|> pCtorApp
   p s
@@ -144,37 +144,47 @@ and bottomLevelParser : Parser<Ast, unit> =
 
 and constructorApplicationParser : Parser<Range * (Constructor * Ast list), unit> =
   fun s ->
-  let pCtor = constructorParser .>> spaces
+  let pCtor = constructorToken .>> spaces
   let pArg = enclose (many absLevelParser)
   let p = withRange (pCtor .>>. pArg)
   p s
 
 
+let typeIdentifierToken : Parser<TypeIdent, unit> =
+  identifierToken |>> function Ident(_, tyident) -> tyident
+
+
 let rec typeParser : Parser<ManualType, unit> =
   fun s ->
-  let p = arrowLevelTypeParser <|> appLevelTypeParser <|> bottomLevelTypeParser
+  let p = arrowTypeParser <|> appLevelTypeParser
   p s
 
 
-and arrowLevelTypeParser : Parser<ManualType, unit> =
+and arrowTypeParser  : Parser<ManualType, unit> =
   fun s ->
   let pMain =
     appLevelTypeParser .>> (token "->") .>>. arrowLevelTypeParser
   let p = withRange (pMain |>> fun (mnty1, mnty2) -> MFuncType(mnty1, mnty2))
-  p s
+  (attempt p) s
 
 
 and appLevelTypeParser : Parser<ManualType, unit> =
   fun s ->
-  let p1 = identifierToken |>> function Ident(_, tyident) -> tyident
+  let p = appTypeParser <|> bottomLevelTypeParser
+  p s
+
+
+and appTypeParser : Parser<ManualType, unit> =
+  fun s ->
+  let p1 = typeIdentifierToken .>> spaces
   let p2 = many1 bottomLevelTypeParser
   let p = withRange (pipe2 p1 p2 (fun tyident mntys -> MDataType(tyident, mntys)))
-  p s
+  (attempt p) s
 
 
 and bottomLevelTypeParser : Parser<ManualType, unit> =
   fun s ->
-  let pTyVar = withRange (typeVariableParser |>> fun s -> MTypeVar(s))
+  let pTyVar = withRange (typeVariableToken |>> fun s -> MTypeVar(s))
   let pNullary = withRange (identifierToken |>> function Ident(_, tyident) -> MDataType(tyident, []))
   let pParen = enclose typeParser
   let p = ((pTyVar <|> pNullary) .>> spaces) <|> pParen
@@ -182,18 +192,18 @@ and bottomLevelTypeParser : Parser<ManualType, unit> =
 
 
 let generalizedConstructorBranchParser : Parser<GeneralizedConstructorBranch, unit> =
-  let pBar = token "|"
-  let pCtor = constructorParser .>> spaces
-  let pTyVars = many (typeVariableParser .>> spaces)
+  let pCtor = token "|" >>. constructorToken .>> spaces
+  let pTyVars = many (typeVariableToken .>> spaces)
   let pParamTys = sepBy typeParser (token ",")
-  pipe3 (pBar >>. pCtor) pTyVars pParamTys (fun ctor tyvars mntys -> GeneralizedConstructorBranch(ctor, tyvars, mntys))
+  let pRet = token ":" >>. (typeIdentifierToken .>> spaces) .>>. (many typeParser)
+  pipe4 pCtor pTyVars pParamTys pRet (fun ctor tyvars mntys (tyident, mntyrets) -> GeneralizedConstructorBranch(ctor, tyvars, mntys, tyident, mntyrets))
 
 
 let typeBindingParser : Parser<TypeBinding, unit> =
   fun s ->
-  let pIdent = (identifierToken .>> spaces) |>> function Ident(_, tyident) -> tyident
+  let pIdent = typeIdentifierToken .>> spaces
   let pBranches = token "=" >>. many generalizedConstructorBranchParser
-  let p = pipe3 pIdent integerParser pBranches (fun tyident (_, arity) gctorbrs -> Generalized(tyident, arity, gctorbrs))
+  let p = pipe3 pIdent (integerToken .>> spaces) pBranches (fun tyident (_, arity) gctorbrs -> Generalized(tyident, arity, gctorbrs))
   p s
 
 

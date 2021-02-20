@@ -35,6 +35,12 @@ let check (input : string) (x : string) (ptyExpect : PolyType) =
   | Error(err) -> (false, sprintf "error: %O" err)
 
 
+let parse (input : string) =
+  match Parser.parse input with
+  | Ok(_)      -> (true, "")
+  | Error(msg) -> (false, msg)
+
+
 [<SetUp>]
 let Setup () =
     ()
@@ -74,7 +80,7 @@ let ``typing foldl`` () =
 
 
 [<Test>]
-let ``typing conditionals`` () =
+let ``typing a conditional expression`` () =
   let input =
     """
     val f = fun b -> fun x -> fun y ->
@@ -85,4 +91,27 @@ let ``typing conditionals`` () =
     let ptyA = freshPolyType ()
     (boolType DummyRange --> (ptyA --> (ptyA --> ptyA)))
   let (b, msg) = check input ident ptyExpect
+  Assert.IsTrue(b, msg)
+
+
+[<Test>]
+let ``parsing a type binding 1`` () =
+  let input =
+    """
+    type result 1 =
+      | Ok    'v 'e ('v) : result 'v 'e
+      | Error 'v 'e ('e) : result 'v 'e
+    """
+  let (b, msg) = parse input
+  Assert.IsTrue(b, msg)
+
+[<Test>]
+let ``parsing a type binding 2`` () =
+  let input =
+    """
+    type ast 1 =
+      | App 'a 'b (ast ('a -> 'b), ast 'a) : ast 'b
+      | Const 'a  ('a)                     : ast 'a
+    """
+  let (b, msg) = parse input
   Assert.IsTrue(b, msg)

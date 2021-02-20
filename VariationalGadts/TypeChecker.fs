@@ -12,6 +12,7 @@ type TypeError =
   | UnboundTypeVariable of Range * ManualTypeVar
   | UnboundTypeIdent    of Range * TypeIdent
   | InvalidArityOfType  of Range * TypeIdent * int * int
+  | InvalidTypeNameForConstructorBranch of Range * TypeIdent * TypeIdent
   | Inclusion           of FreeId * MonoType * MonoType
   | Contradiction       of MonoType * MonoType
   | ArityMismatch       of Range * int * int
@@ -257,8 +258,14 @@ let typecheckBinding (tyenv : TypeEnv) (bind : Binding) : Result<TypeEnv, TypeEr
       let tyenv = tyenv.AddType(tyident, dtid, arity)
       gctorbrs |> List.fold (fun res gctorbr ->
         match gctorbr with
-        | GeneralizedConstructorBranch(Ctor(_, ctor), tyvars, mtys) ->
+        | GeneralizedConstructorBranch(Ctor(rng, ctor), tyvars, mtys, tyidentDummy, mtyrets) ->
+            // TODO: use `mtyrets`
             result {
+              let! () =
+                if tyident = tyidentDummy then
+                  Ok(())
+                else
+                  Error(InvalidTypeNameForConstructorBranch(rng, tyident, tyidentDummy))
               let! tyenv = res
               let (tyenvSub, bidacc) : TypeEnv * Alist<BoundId> =
                 tyvars |> List.fold (fun (tyenvSub, bidacc) tyvar ->

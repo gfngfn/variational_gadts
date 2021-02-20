@@ -98,7 +98,7 @@ and ValueBinding =
 
 
 type GeneralizedConstructorBranch =
-  | GeneralizedConstructorBranch of Constructor * ManualTypeVar list * ManualType list
+  | GeneralizedConstructorBranch of Constructor * ManualTypeVar list * ManualType list * TypeIdent * ManualType list
 
 
 type TypeBinding =
