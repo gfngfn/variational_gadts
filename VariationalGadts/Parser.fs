@@ -207,8 +207,9 @@ let generalizedConstructorBranchParser : Parser<GeneralizedConstructorBranch, un
 let typeBindingParser : Parser<TypeBinding, unit> =
   fun s ->
   let pIdent = typeIdentifierToken .>> spaces
+  let pArity = token "::" >>. integerToken .>> spaces
   let pBranches = token "=" >>. many generalizedConstructorBranchParser
-  let p = pipe3 pIdent (integerToken .>> spaces) pBranches (fun tyident (_, arity) gctorbrs -> Generalized(tyident, arity, gctorbrs))
+  let p = pipe3 pIdent pArity pBranches (fun tyident (_, arity) gctorbrs -> Generalized(tyident, arity, gctorbrs))
   p s
 
 

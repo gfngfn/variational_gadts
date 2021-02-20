@@ -113,7 +113,7 @@ let ``typing a conditional expression`` () =
 let ``parsing a type binding 1`` () =
   let input =
     """
-    type result 1 =
+    type result :: 1 =
       | Ok    'v 'e ('v) : result 'v 'e
       | Error 'v 'e ('e) : result 'v 'e
     """
@@ -124,7 +124,7 @@ let ``parsing a type binding 1`` () =
 let ``parsing a type binding 2`` () =
   let input =
     """
-    type ast 1 =
+    type ast :: 1 =
       | App 'a 'b (ast ('a -> 'b), ast 'a) : ast 'b
       | Const 'a  ('a)                     : ast 'a
     """

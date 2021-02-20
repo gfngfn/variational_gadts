@@ -18,7 +18,7 @@ let main argv =
 val f = fun b -> fun x -> fun y ->
   if b then x else y
 
-type ast 1 =
+type ast :: 1 =
   | App 'a 'b (ast ('a -> 'b), ast 'a) : ast 'b
   | Const 'a  ('a)                     : ast 'a
 """
