@@ -7,14 +7,14 @@ open Syntax
 
 
 type TypeError =
-  | UnboundVariable of Range * string
-  | UnboundConstructor of Range * Constructor
+  | UnboundVariable     of Range * string
+  | UnboundConstructor  of Range * Constructor
   | UnboundTypeVariable of Range * ManualTypeVar
   | UnboundTypeIdent    of Range * TypeIdent
   | InvalidArityOfType  of Range * TypeIdent * int * int
-  | Inclusion       of FreeId * MonoType * MonoType
-  | Contradiction   of MonoType * MonoType
-  | ArityMismatch   of Range * int * int
+  | Inclusion           of FreeId * MonoType * MonoType
+  | Contradiction       of MonoType * MonoType
+  | ArityMismatch       of Range * int * int
 
 
 type UnificationError =
