@@ -26,6 +26,7 @@ let identifierParser s =
     let isIdentifierFirstChar c = isLetter c
     let isIdentifierChar c = isLetter c || isDigit c || c = '_'
     many1Satisfy2L isIdentifierFirstChar isIdentifierChar "identifier" >>= begin function
+    | "val"
     | "fun"
     | "let" | "in" | "rec"
     | "if" | "then" | "else"
@@ -49,21 +50,26 @@ let rec absLevelParser s =
 
 
 and letParser s =
+  let pValBind = pstring "let" .>> spaces >>. valueBindingParser
+  let pInner = pstring "in" .>> spaces >>. absLevelParser
+  let p = pipe2 pValBind pInner (fun valbind e -> LocalBinding(valbind, e))
+  (withRange p) s
+
+
+and valueBindingParser s =
   let p1 : Parser<bool * Ident, 'u> =
     let pRec : Parser<bool, 'u> =
        opt (pstring "rec" .>> spaces) |>> function
        | None    -> false
        | Some(_) -> true
-    pstring "let" .>> spaces >>. pRec .>>. identifierParser .>> spaces .>> pstring "=" .>> spaces
-  let p2f ((isRec, ident) : bool * Ident) : Parser<AstMain, 'u> =
-    let p21 = absLevelParser .>> pstring "in" .>> spaces
-    let p22 = absLevelParser
-    pipe2 p21 p22 (fun e1 e2 ->
+    pRec .>>. identifierParser .>> spaces .>> pstring "=" .>> spaces
+  let p2f ((isRec, ident) : bool * Ident) : Parser<ValueBinding, 'u> =
+    absLevelParser |>> (fun e1 ->
       if isRec then
-        LetRecIn(ident, e1, e2)
+        Rec(ident, e1)
       else
-        LetIn(ident, e1, e2))
-  let p = withRange (p1 >>= p2f)
+        NonRec(ident, e1))
+  let p = p1 >>= p2f
   p s
 
 
@@ -104,7 +110,12 @@ and bottomLevelParser s =
   p s
 
 
-let parse (s : string) : Result<Ast, ParseError> =
-  match run (spaces >>. absLevelParser) s with
-  | Success(e, _, _)   -> Result.Ok(e)
+let bindingParser s =
+  let pValBind = pstring "val" .>> spaces >>. valueBindingParser |>> (fun valbind -> BindValue(valbind))
+  pValBind s
+
+
+let parse (s : string) : Result<Binding list, ParseError> =
+  match run (spaces >>. many bindingParser) s with
+  | Success(binds, _, _)   -> Result.Ok(binds)
   | Failure(msg, _, _) -> Result.Error(msg)

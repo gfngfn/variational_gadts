@@ -171,22 +171,10 @@ let rec typecheck (tyenv : TypeEnv) (e : Ast) : Result<MonoType, TypeError> =
         return tyR
       }
 
-  | LetIn(Ident(rngx, x), e1, e2) ->
+  | LocalBinding(valbind, e2) ->
       result {
-        let! ty1 = typecheck tyenv e1
-        let pty1 = TypeConv.generalize tyenv ty1
-        let! ty2 = typecheck (tyenv.AddValue(x, pty1)) e2
-        return ty2
-      }
-
-  | LetRecIn(Ident(rngx, x), e1, e2) ->
-      let ty = freshMonoType rngx
-      let tyenv = tyenv.AddValue(x, TypeConv.lift ty)
-      result {
-        let! ty1 = typecheck tyenv e1
-        let! () = unify ty1 ty
-        let pty1 = TypeConv.generalize tyenv ty1
-        let! ty2 = typecheck tyenv e2
+        let! tyenvSub = typecheckValueBinding tyenv valbind
+        let! ty2 = typecheck tyenvSub e2
         return ty2
       }
 
@@ -199,3 +187,39 @@ let rec typecheck (tyenv : TypeEnv) (e : Ast) : Result<MonoType, TypeError> =
         let! () = unify ty1 ty2
         return ty1
       }
+
+
+and typecheckValueBinding (tyenv : TypeEnv) (valbind : ValueBinding) : Result<TypeEnv, TypeError> =
+  match valbind with
+  | NonRec(Ident(rngx, x), e1) ->
+      result {
+        let! ty1 = typecheck tyenv e1
+        let pty1 = TypeConv.generalize tyenv ty1
+        return (tyenv.AddValue(x, pty1))
+      }
+
+  | Rec(Ident(rngx, x), e1) ->
+      let ty = freshMonoType rngx
+      let tyenvSub = tyenv.AddValue(x, TypeConv.lift ty)
+      result {
+        let! ty1 = typecheck tyenvSub e1
+        let! () = unify ty1 ty
+        let pty1 = TypeConv.generalize tyenv ty1
+        return tyenv.AddValue(x, pty1)
+      }
+
+
+let typecheckBinding (tyenv : TypeEnv) (bind : Binding) : Result<TypeEnv, TypeError> =
+  match bind with
+  | BindValue(valbind) ->
+      typecheckValueBinding tyenv valbind
+
+
+let typecheckBindingList (tyenv : TypeEnv) (binds : Binding list) : Result<TypeEnv, TypeError> =
+  List.fold (fun res bind ->
+    result {
+      let! tyenv = res
+      let! tyenv = typecheckBinding tyenv bind
+      return tyenv
+    }
+  ) (Ok(tyenv)) binds

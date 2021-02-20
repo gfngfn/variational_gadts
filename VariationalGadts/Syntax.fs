@@ -49,8 +49,7 @@ and AstMain =
   | Var          of Ident
   | Apply        of Ast * Ast
   | Lambda       of Ident * Ast
-  | LetIn        of Ident * Ast * Ast
-  | LetRecIn     of Ident * Ast * Ast
+  | LocalBinding of ValueBinding * Ast
   | IfThenElse   of Ast * Ast * Ast
   | BaseConstant of BaseConstant
   | Constructor  of Constructor * Ast list
@@ -60,11 +59,24 @@ and AstMain =
     | Var(Ident(_, x))       -> sprintf "Var(\"%s\")" x
     | Apply(e1, e2)          -> sprintf "Apply(%O, %O)" e1 e2
     | Lambda(ident, e)       -> sprintf "Lambda(%O, %O)" ident e
-    | LetIn(i, e1, e2)       -> sprintf "LetIn(%O, %O, %O)" i e1 e2
-    | LetRecIn(i, e1, e2)    -> sprintf "LetRecIn(%O, %O, %O)" i e1 e2
+    | LocalBinding(bind, e)  -> sprintf "LocalBinding(%O, %O)" bind e
     | IfThenElse(e0, e1, e2) -> sprintf "IfThenElse(%O, %O, %O)" e0 e1 e2
     | BaseConstant(bc)       -> sprintf "BaseConstant(%O)" bc
     | Constructor(ctor, es)  -> sprintf "Constructor(%s, %O)" ctor es
+
+
+and ValueBinding =
+  | NonRec of Ident * Ast
+  | Rec    of Ident * Ast
+
+  override this.ToString () =
+    match this with
+    | NonRec(i, e1) -> sprintf "NonRec(%O, %O)" i e1
+    | Rec(i, e1)    -> sprintf "Rec(%O, %O)" i e1
+
+
+type Binding =
+  | BindValue of ValueBinding
 
 
 type FreeId private(n : int) =
