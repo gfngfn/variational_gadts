@@ -35,3 +35,17 @@ module List =
         ) (Ok([]))
       return (List.rev acc)
     }
+
+
+type Alist<'a> private(acc : 'a list) =
+
+  member private this.Contents = acc
+
+  new() =
+    new Alist<'a>([])
+
+  member public this.Extend(elem : 'a) : Alist<'a> =
+    new Alist<'a>(elem :: this.Contents)
+
+  member public this.ToList() : 'a list =
+    List.rev this.Contents

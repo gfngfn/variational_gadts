@@ -31,6 +31,20 @@ type Ident =
     | Ident(r, x) -> sprintf "Ident(%O, \"%s\")" r x
 
 
+type TypeIdent =
+  string
+
+
+type ManualTypeVar =
+  string
+
+
+type ManualType =
+  | MTypeVar  of ManualTypeVar
+  | MDataType of TypeIdent * ManualType list
+  | MFuncType of ManualType * ManualType
+
+
 type BaseConstant =
   | UnitValue
   | BooleanValue of bool
@@ -75,8 +89,17 @@ and ValueBinding =
     | Rec(i, e1)    -> sprintf "Rec(%O, %O)" i e1
 
 
+type ConstructorBranch =
+  | ConstructorBranch of Constructor * ManualType list
+
+
+type TypeBinding =
+  TypeIdent * ManualTypeVar list * ConstructorBranch list
+
+
 type Binding =
   | BindValue of ValueBinding
+  | BindType  of TypeBinding
 
 
 type FreeId private(n : int) =
@@ -205,14 +228,16 @@ type ConstructorDef =
 
 type TypeEnv =
   private {
-    Vars : Map<string, PolyType>;
-    Ctors : Map<Constructor, ConstructorDef>
+    Vars   : Map<string, PolyType>;
+    Ctors  : Map<Constructor, ConstructorDef>;
+    TyVars : Map<ManualTypeVar, BoundId>;
   }
 
   static member empty =
     {
-      Vars = Map.empty;
-      Ctors = Map.empty;
+      Vars   = Map.empty;
+      Ctors  = Map.empty;
+      TyVars = Map.empty;
     }
 
   member this.FoldValue(f, init) =
@@ -229,6 +254,12 @@ type TypeEnv =
 
   member this.TryFindConstructor(ctor) =
     this.Ctors.TryFind(ctor)
+
+  member this.AddTypeVariable(tyvar, bid) =
+    { this with TyVars = this.TyVars.Add(tyvar, bid) }
+
+  member this.FindTypeVariable(tyvar) =
+    this.TyVars.TryFind(tyvar)
 
 
 let unitTypeId = new DataTypeId("unit")

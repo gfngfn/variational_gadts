@@ -131,6 +131,10 @@ let typecheckConstructor (tyenv : TypeEnv) (rng : Range) (ctor : string) : Resul
       Ok(tyArgs, tyRet)
 
 
+let decodeManualType (tyenv : TypeEnv) (mnty : ManualType) : Result<PolyType, TypeError> =
+  failwith "TODO: decodeManualType"
+
+
 let rec typecheck (tyenv : TypeEnv) (e : Ast) : Result<MonoType, TypeError> =
   let (rng, eMain) = e in
   match eMain with
@@ -213,6 +217,39 @@ let typecheckBinding (tyenv : TypeEnv) (bind : Binding) : Result<TypeEnv, TypeEr
   match bind with
   | BindValue(valbind) ->
       typecheckValueBinding tyenv valbind
+
+  | BindType(tybind) ->
+      let (tyident, tyvars, ctorbrs) = tybind
+      let dtid = new DataTypeId(tyident)
+      let (tyenv, bidacc) : TypeEnv * Alist<BoundId> =
+        tyvars |> List.fold (fun (tyenv, bidacc) tyvar ->
+          let bid = new BoundId()
+          (tyenv.AddTypeVariable(tyvar, bid), bidacc.Extend(bid))
+        ) (tyenv, new Alist<BoundId>())
+      let bids = bidacc.ToList()
+      let typarams = bids |> List.map (fun bid -> (DummyRange, TypeVar(Bound(bid))))
+      ctorbrs |> List.fold (fun res ctorbr ->
+        match ctorbr with
+        | ConstructorBranch(ctor, mtys) ->
+            result {
+              let! tyenv = res
+              let! ptyacc =
+                mtys |> List.fold (fun (res : Result<Alist<PolyType>, TypeError>) mty ->
+                  result {
+                    let! ptyacc = res
+                    let! pty = decodeManualType tyenv mty
+                    return ptyacc.Extend(pty)
+                  }
+                ) (Ok(new Alist<PolyType>()))
+              let ctordef =
+                {
+                  BoundIds = bids;
+                  MainType = (DummyRange, DataType(dtid, typarams));
+                  ArgTypes = ptyacc.ToList();
+                }
+              return tyenv.AddConstructor(ctor, ctordef)
+            }
+      ) (Ok(tyenv))
 
 
 let typecheckBindingList (tyenv : TypeEnv) (binds : Binding list) : Result<TypeEnv, TypeError> =
