@@ -15,10 +15,8 @@ type ProgramError =
 [<EntryPoint>]
 let main argv =
   let input = """
-let f = fun b -> fun x -> fun y ->
+val f = fun b -> fun x -> fun y ->
   if b then x else y
-in
-f
 """
   let tyenv = Primitives.initialTypeEnvironment
   let res =

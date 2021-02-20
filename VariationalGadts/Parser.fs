@@ -23,7 +23,7 @@ let withRange (p : Parser<'r, 'u>) : Parser<Range * 'r, 'u> =
 
 let identifierParser s =
   let pMain =
-    let isIdentifierFirstChar c = isLetter c
+    let isIdentifierFirstChar c = isLower c
     let isIdentifierChar c = isLetter c || isDigit c || c = '_'
     many1Satisfy2L isIdentifierFirstChar isIdentifierChar "identifier" >>= begin function
     | "val"
@@ -38,6 +38,15 @@ let identifierParser s =
     end
   let p = withRange pMain |>> (fun (r, x) -> Ident(r, x))
   (attempt p) s
+
+
+let constructorParser s =
+  let pMain =
+    let isConstructorFirstChar c = isUpper c
+    let isConstructorChar c = isLetter c || isDigit c || c = '_'
+    many1Satisfy2L isConstructorFirstChar isConstructorChar "constructor"
+  let p = withRange pMain |>> (fun (r, s) -> Ctor(r, s))
+  p s
 
 
 let integerParser s =
@@ -100,13 +109,21 @@ and appLevelParser s =
 
 and bottomLevelParser s =
   let pIdent = identifierParser >>= fun ident -> match ident with Ident(r, _) -> preturn (r, Var(ident))
-  let pNil = withRange (pstring "[]" |>> fun _ -> Constructor("[]", []))
+  let pCtorApp = constructorApplicationParser |>> fun (r, (ctor, es)) -> (r, Constructor(ctor, es))
+  let pNil = (withRange (pstring "[]")) |>> fun (r, _) -> (r, Constructor(Ctor(r, "[]"), []))
   let pTrue = withRange (pstring "true" |>> fun _ -> BaseConstant(BooleanValue(true)))
   let pFalse = withRange (pstring "false" |>> fun _ -> BaseConstant(BooleanValue(false)))
   let pUnitConst = withRange (pstring "()" |>> fun _ -> BaseConstant(UnitValue))
   let pIntConst = integerParser |>> fun (r, n) -> (r, BaseConstant(IntegerValue(n)))
   let pParen = between (pstring "(" .>> spaces) (pstring ")") absLevelParser
-  let p = (pIdent <|> pNil <|> pTrue <|> pFalse <|> pUnitConst <|> pIntConst <|> pParen) .>> spaces
+  let p = ((pIdent <|> pNil <|> pTrue <|> pFalse <|> pUnitConst <|> pIntConst <|> pParen) .>> spaces) <|> pCtorApp
+  p s
+
+
+and constructorApplicationParser s =
+  let pCtor = constructorParser .>> spaces
+  let pArg = between (pstring "(" .>> spaces) (pstring ")" .>> spaces) (many absLevelParser)
+  let p : Parser<Range * (Constructor * Ast list), 'u> = withRange (pCtor .>>. pArg)
   p s
 
 
@@ -116,6 +133,6 @@ let bindingParser s =
 
 
 let parse (s : string) : Result<Binding list, ParseError> =
-  match run (spaces >>. many bindingParser) s with
+  match run (spaces >>. many bindingParser .>> eof) s with
   | Success(binds, _, _)   -> Result.Ok(binds)
   | Failure(msg, _, _) -> Result.Error(msg)

@@ -56,7 +56,11 @@ type BaseConstant =
 
 
 type Constructor =
-  string
+  | Ctor of Range * string
+
+  override this.ToString() =
+    match this with
+    | Ctor(r, s) -> sprintf "Ctor(%O, \"%s\")" r s
 
 
 type Ast =
@@ -80,7 +84,7 @@ and AstMain =
     | LocalBinding(bind, e)  -> sprintf "LocalBinding(%O, %O)" bind e
     | IfThenElse(e0, e1, e2) -> sprintf "IfThenElse(%O, %O, %O)" e0 e1 e2
     | BaseConstant(bc)       -> sprintf "BaseConstant(%O)" bc
-    | Constructor(ctor, es)  -> sprintf "Constructor(%s, %O)" ctor es
+    | Constructor(Ctor(_, s), es) -> sprintf "Constructor(%s, %O)" s es
 
 
 and ValueBinding =
@@ -233,7 +237,7 @@ type ConstructorDef =
 type TypeEnv =
   private {
     Vars   : Map<string, PolyType>;
-    Ctors  : Map<Constructor, ConstructorDef>;
+    Ctors  : Map<string, ConstructorDef>;
     TyVars : Map<ManualTypeVar, BoundId>;
     Types  : Map<TypeIdent, DataTypeId * int>;
   }

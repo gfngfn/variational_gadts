@@ -8,7 +8,7 @@ open Syntax
 
 type TypeError =
   | UnboundVariable     of Range * string
-  | UnboundConstructor  of Range * Constructor
+  | UnboundConstructor  of Range * string
   | UnboundTypeVariable of Range * ManualTypeVar
   | UnboundTypeIdent    of Range * TypeIdent
   | InvalidArityOfType  of Range * TypeIdent * int * int
@@ -116,7 +116,7 @@ let typecheckBaseConstant (rng : Range) (bc : BaseConstant) =
   | IntegerValue(_) -> intType rng
 
 
-let typecheckConstructor (tyenv : TypeEnv) (rng : Range) (ctor : string) : Result<MonoType list * MonoType, TypeError> =
+let typecheckConstructor (tyenv : TypeEnv) (Ctor(rng, ctor) : Constructor) : Result<MonoType list * MonoType, TypeError> =
   match tyenv.TryFindConstructor(ctor) with
   | None ->
       Error(UnboundConstructor(rng, ctor))
@@ -178,7 +178,7 @@ let rec typecheck (tyenv : TypeEnv) (e : Ast) : Result<MonoType, TypeError> =
 
   | Constructor(ctor, es) ->
       result {
-        let! (tysExpected, tyRes) = typecheckConstructor tyenv rng ctor
+        let! (tysExpected, tyRes) = typecheckConstructor tyenv ctor
         let! tysGiven = es |> List.mapM (typecheck tyenv)
         let! () = unifyList rng tysGiven tysExpected
         return tyRes
@@ -265,7 +265,7 @@ let typecheckBinding (tyenv : TypeEnv) (bind : Binding) : Result<TypeEnv, TypeEr
       let typarams = bids |> List.map (fun bid -> (DummyRange, TypeVar(Bound(bid))))
       ctorbrs |> List.fold (fun res ctorbr ->
         match ctorbr with
-        | ConstructorBranch(ctor, mtys) ->
+        | ConstructorBranch(Ctor(_, ctor), mtys) ->
             result {
               let! tyenv = res
               let! ptyacc =
