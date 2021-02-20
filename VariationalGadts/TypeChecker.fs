@@ -275,9 +275,8 @@ let typecheckBinding (tyenv : TypeEnv) (bind : Binding) : Result<TypeEnv, TypeEr
               let bids = bidacc.ToList()
               let typarams = bids |> List.map (fun bid -> (DummyRange, TypeVar(Bound(bid))))
               let! ptyacc =
-                mtys |> List.fold (fun (res : Result<Alist<PolyType>, TypeError>) mty ->
+                mtys |> List.foldM (fun (ptyacc : Alist<PolyType>) mty ->
                   result {
-                    let! ptyacc = res
                     let! pty = decodeManualType tyenvSub mty
                     return ptyacc.Extend(pty)
                   }
