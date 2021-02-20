@@ -40,6 +40,10 @@ type ManualTypeVar =
 
 
 type ManualType =
+  Range * ManualTypeMain
+
+
+and ManualTypeMain =
   | MTypeVar  of ManualTypeVar
   | MDataType of TypeIdent * ManualType list
   | MFuncType of ManualType * ManualType
@@ -260,7 +264,7 @@ type TypeEnv =
   member this.AddTypeVariable(tyvar, bid) =
     { this with TyVars = this.TyVars.Add(tyvar, bid) }
 
-  member this.FindTypeVariable(tyvar) =
+  member this.TryFindTypeVariable(tyvar) =
     this.TyVars.TryFind(tyvar)
 
   member this.AddType(tyident, dtid, arity) =

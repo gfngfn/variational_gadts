@@ -9,6 +9,9 @@ open Syntax
 type TypeError =
   | UnboundVariable of Range * string
   | UnboundConstructor of Range * Constructor
+  | UnboundTypeVariable of Range * ManualTypeVar
+  | UnboundTypeIdent    of Range * TypeIdent
+  | InvalidArityOfType  of Range * TypeIdent * int * int
   | Inclusion       of FreeId * MonoType * MonoType
   | Contradiction   of MonoType * MonoType
   | ArityMismatch   of Range * int * int
@@ -131,8 +134,39 @@ let typecheckConstructor (tyenv : TypeEnv) (rng : Range) (ctor : string) : Resul
       Ok(tyArgs, tyRet)
 
 
-let decodeManualType (tyenv : TypeEnv) (mnty : ManualType) : Result<PolyType, TypeError> =
-  failwith "TODO: decodeManualType"
+let rec decodeManualType (tyenv : TypeEnv) (mnty : ManualType) : Result<PolyType, TypeError> =
+  let aux = decodeManualType tyenv
+  let (rng, mntyMain) = mnty
+  match mntyMain with
+  | MTypeVar(tyvar) ->
+      match tyenv.TryFindTypeVariable(tyvar) with
+      | None ->
+          Error(UnboundTypeVariable(rng, tyvar))
+
+      | Some(bid) ->
+          Ok((rng, TypeVar(Bound(bid))))
+
+  | MDataType(tyident, mntys) ->
+      match tyenv.TryFindType(tyident) with
+      | None ->
+          Error(UnboundTypeIdent(rng, tyident))
+
+      | Some((dtid, arityExpect)) ->
+          let arityGot = List.length mntys
+          if arityExpect = arityGot then
+            result {
+              let! ptys = mntys |> List.mapM aux
+              return (rng, DataType(dtid, ptys))
+            }
+          else
+            Error(InvalidArityOfType(rng, tyident, arityExpect, arityGot))
+
+  | MFuncType(mnty1, mnty2) ->
+      result {
+        let! pty1 = aux mnty1
+        let! pty2 = aux mnty2
+        return (rng, FuncType(pty1, pty2))
+      }
 
 
 let rec typecheck (tyenv : TypeEnv) (e : Ast) : Result<MonoType, TypeError> =
