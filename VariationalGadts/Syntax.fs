@@ -253,6 +253,12 @@ type TypeEnv =
   member this.FoldValue(f, init) =
     this.Vars |> Map.fold f init
 
+  member this.FoldConstructor(f, init) =
+    this.Ctors |> Map.fold f init
+
+  member this.FoldType(f, init) =
+    this.Types |> Map.fold f init
+
   member this.TryFindValue(x) =
     this.Vars.TryFind(x)
 
