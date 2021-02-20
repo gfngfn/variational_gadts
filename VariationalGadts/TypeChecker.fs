@@ -258,8 +258,7 @@ let typecheckBinding (tyenv : TypeEnv) (bind : Binding) : Result<TypeEnv, TypeEr
       let tyenv = tyenv.AddType(tyident, dtid, arity)
       gctorbrs |> List.fold (fun res gctorbr ->
         match gctorbr with
-        | GeneralizedConstructorBranch(Ctor(rng, ctor), tyvars, mtys, tyidentDummy, mtyrets) ->
-            // TODO: use `mtyrets`
+        | GeneralizedConstructorBranch(Ctor(rng, ctor), tyvars, mtys, tyidentDummy, mtyretargs) ->
             result {
               let! () =
                 if tyident = tyidentDummy then
@@ -273,7 +272,10 @@ let typecheckBinding (tyenv : TypeEnv) (bind : Binding) : Result<TypeEnv, TypeEr
                   (tyenvSub.AddTypeVariable(tyvar, bid), bidacc.Extend(bid))
                 ) (tyenv, new Alist<BoundId>())
               let bids = bidacc.ToList()
-              let typarams = bids |> List.map (fun bid -> (DummyRange, TypeVar(Bound(bid))))
+              let! tyretargs =
+                mtyretargs |> List.mapM (fun mty ->
+                  decodeManualType tyenvSub mty
+                )
               let! ptyacc =
                 mtys |> List.foldM (fun (ptyacc : Alist<PolyType>) mty ->
                   result {
@@ -284,7 +286,7 @@ let typecheckBinding (tyenv : TypeEnv) (bind : Binding) : Result<TypeEnv, TypeEr
               let ctordef =
                 {
                   BoundIds = bids;
-                  MainType = (DummyRange, DataType(dtid, typarams));
+                  MainType = (DummyRange, DataType(dtid, tyretargs));
                   ArgTypes = ptyacc.ToList();
                 }
               return tyenv.AddConstructor(ctor, ctordef)
