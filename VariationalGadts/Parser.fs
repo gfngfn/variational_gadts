@@ -163,7 +163,7 @@ let rec typeParser : Parser<ManualType, unit> =
 and arrowTypeParser  : Parser<ManualType, unit> =
   fun s ->
   let pMain =
-    appLevelTypeParser .>> (token "->") .>>. arrowLevelTypeParser
+    appLevelTypeParser .>> (token "->") .>>. typeParser
   let p = withRange (pMain |>> fun (mnty1, mnty2) -> MFuncType(mnty1, mnty2))
   (attempt p) s
 
@@ -177,24 +177,29 @@ and appLevelTypeParser : Parser<ManualType, unit> =
 and appTypeParser : Parser<ManualType, unit> =
   fun s ->
   let p1 = typeIdentifierToken .>> spaces
-  let p2 = many1 bottomLevelTypeParser
+  let p2 = many (bottomLevelTypeParser <|> nullaryTypeParser)
   let p = withRange (pipe2 p1 p2 (fun tyident mntys -> MDataType(tyident, mntys)))
   (attempt p) s
 
 
+and nullaryTypeParser : Parser<ManualType, unit> =
+  fun s ->
+  let p = (withRange typeIdentifierToken) .>> spaces |>> fun (r, tyident) -> (r, MDataType(tyident, []))
+  p s
+
+
 and bottomLevelTypeParser : Parser<ManualType, unit> =
   fun s ->
-  let pTyVar = withRange (typeVariableToken |>> fun s -> MTypeVar(s))
-  let pNullary = withRange (identifierToken |>> function Ident(_, tyident) -> MDataType(tyident, []))
+  let pTyVar = withRange (typeVariableToken |>> fun s -> MTypeVar(s)) .>> spaces
   let pParen = enclose typeParser
-  let p = ((pTyVar <|> pNullary) .>> spaces) <|> pParen
+  let p = pTyVar <|> pParen
   p s
 
 
 let generalizedConstructorBranchParser : Parser<GeneralizedConstructorBranch, unit> =
   let pCtor = token "|" >>. constructorToken .>> spaces
   let pTyVars = many (typeVariableToken .>> spaces)
-  let pParamTys = sepBy typeParser (token ",")
+  let pParamTys = enclose (sepBy typeParser (token ","))
   let pRet = token ":" >>. (typeIdentifierToken .>> spaces) .>>. (many typeParser)
   pipe4 pCtor pTyVars pParamTys pRet (fun ctor tyvars mntys (tyident, mntyrets) -> GeneralizedConstructorBranch(ctor, tyvars, mntys, tyident, mntyrets))
 
