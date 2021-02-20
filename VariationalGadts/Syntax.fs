@@ -175,7 +175,38 @@ type DataTypeId private(n : int, s : string) =
   override this.Equals(obj : obj) =
     match obj with
     | :? DataTypeId as other -> this.Number = other.Number
-    | _                      -> invalidArg "obj" "not of type BoundId"
+    | _                      -> invalidArg "obj" "not of type DataTypeId"
+
+
+type ChoiceId private(n : int) =
+  static let mutable current = 0
+
+  new() =
+    current <- current + 1
+    new ChoiceId(current)
+
+  member this.Number = n
+
+  override this.ToString() =
+    sprintf "C%d" n
+
+  override this.GetHashCode() =
+    this.Number.GetHashCode()
+
+  override this.Equals(obj : obj) =
+    match obj with
+    | :? ChoiceId as other -> this.Number = other.Number
+    | _                    -> invalidArg "obj" "not of type ChoiceId"
+
+  interface IComparable<ChoiceId> with
+    member this.CompareTo(other: ChoiceId) : int =
+      this.Number - other.Number
+
+  interface IComparable with
+    member this.CompareTo(obj: obj) =
+      match obj with
+      | :? ChoiceId as other -> this.Number - other.Number
+      | _                    -> invalidArg "obj" "not of type ChoiceId"
 
 
 type Type<'a> =
@@ -192,6 +223,17 @@ and TypeMain<'a> =
     | TypeVar(tv)         -> sprintf "TypeVar(%O)" tv
     | DataType(dtid, tys) -> sprintf "BaseType(%O, %O)" dtid tys
     | FuncType(ty1, ty2)  -> sprintf "FuncType(%O, %O)" ty1 ty2
+
+
+type VariationalType<'a> =
+  Range * VariationalTypeMain<'a>
+
+
+and VariationalTypeMain<'a> =
+  | VTypeVar    of 'a
+  | VDataType   of DataTypeId * VariationalType<'a> list
+  | VFuncType   of VariationalType<'a> * VariationalType<'a>
+  | VChoiceType of ChoiceId * VariationalType<'a> list
 
 
 type MonoTypeVarUpdatable =
