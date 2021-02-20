@@ -59,10 +59,12 @@ and letParser s =
     let p21 = absLevelParser .>> pstring "in" .>> spaces
     let p22 = absLevelParser
     pipe2 p21 p22 (fun e1 e2 ->
-      if isRec then
-        LetRecIn(ident, e1, e2)
-      else
-        LetIn(ident, e1, e2))
+      let valbind =
+        if isRec then
+          Rec(ident, e1)
+        else
+          NonRec(ident, e1)
+      LocalBinding(valbind, e2))
   let p = withRange (p1 >>= p2f)
   p s
 

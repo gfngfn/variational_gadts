@@ -171,7 +171,7 @@ let rec typecheck (tyenv : TypeEnv) (e : Ast) : Result<MonoType, TypeError> =
         return tyR
       }
 
-  | LetIn(Ident(rngx, x), e1, e2) ->
+  | LocalBinding(NonRec(Ident(rngx, x), e1), e2) ->
       result {
         let! ty1 = typecheck tyenv e1
         let pty1 = TypeConv.generalize tyenv ty1
@@ -179,7 +179,7 @@ let rec typecheck (tyenv : TypeEnv) (e : Ast) : Result<MonoType, TypeError> =
         return ty2
       }
 
-  | LetRecIn(Ident(rngx, x), e1, e2) ->
+  | LocalBinding(Rec(Ident(rngx, x), e1), e2) ->
       let ty = freshMonoType rngx
       let tyenv = tyenv.AddValue(x, TypeConv.lift ty)
       result {
