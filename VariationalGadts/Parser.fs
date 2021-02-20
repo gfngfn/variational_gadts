@@ -49,23 +49,26 @@ let rec absLevelParser s =
 
 
 and letParser s =
+  let pValBind = pstring "let" .>> spaces >>. valueBindingParser
+  let pInner = pstring "in" .>> spaces >>. absLevelParser
+  let p = pipe2 pValBind pInner (fun valbind e -> LocalBinding(valbind, e))
+  (withRange p) s
+
+
+and valueBindingParser s =
   let p1 : Parser<bool * Ident, 'u> =
     let pRec : Parser<bool, 'u> =
        opt (pstring "rec" .>> spaces) |>> function
        | None    -> false
        | Some(_) -> true
-    pstring "let" .>> spaces >>. pRec .>>. identifierParser .>> spaces .>> pstring "=" .>> spaces
-  let p2f ((isRec, ident) : bool * Ident) : Parser<AstMain, 'u> =
-    let p21 = absLevelParser .>> pstring "in" .>> spaces
-    let p22 = absLevelParser
-    pipe2 p21 p22 (fun e1 e2 ->
-      let valbind =
-        if isRec then
-          Rec(ident, e1)
-        else
-          NonRec(ident, e1)
-      LocalBinding(valbind, e2))
-  let p = withRange (p1 >>= p2f)
+    pRec .>>. identifierParser .>> spaces .>> pstring "=" .>> spaces
+  let p2f ((isRec, ident) : bool * Ident) : Parser<ValueBinding, 'u> =
+    absLevelParser |>> (fun e1 ->
+      if isRec then
+        Rec(ident, e1)
+      else
+        NonRec(ident, e1))
+  let p = p1 >>= p2f
   p s
 
 
