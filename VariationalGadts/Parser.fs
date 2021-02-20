@@ -38,7 +38,7 @@ let lowerToken : Parser<string, unit> =
 let identifierToken : Parser<Ident, unit> =
   let pMain =
     lowerToken >>= begin function
-    | "val"
+    | "val" | "type"
     | "fun"
     | "let" | "in" | "rec"
     | "if" | "then" | "else"

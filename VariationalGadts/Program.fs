@@ -15,12 +15,12 @@ type ProgramError =
 [<EntryPoint>]
 let main argv =
   let input = """
+val f = fun b -> fun x -> fun y ->
+  if b then x else y
+
 type ast 1 =
   | App 'a 'b (ast ('a -> 'b), ast 'a) : ast 'b
   | Const 'a  ('a)                     : ast 'a
-
-val f = fun b -> fun x -> fun y ->
-  if b then x else y
 """
   let tyenv = Primitives.initialTypeEnvironment
   let res =
