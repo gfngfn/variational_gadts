@@ -290,6 +290,12 @@ type PolyVariationalType =
   VariationalType<PolyVariationalTypeVar>
 
 
+type MatchingResult =
+  | Top
+  | Bottom
+  | Partial of ChoiceId * MatchingResult list
+
+
 type ConstructorDef =
   {
     BoundIds : BoundId list;

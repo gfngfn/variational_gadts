@@ -110,6 +110,46 @@ let unifyList (rng : Range) (tys1 : MonoType list) (tys2 : MonoType list) : Resu
     Error(ArityMismatch(rng, len1, len2))
 
 
+let unifyVariational (vty1 : MonoVariationalType) (vty2 : MonoVariationalType) : MatchingResult =
+  let rec aux (vty1 : MonoVariationalType) (vty2 : MonoVariationalType) : MatchingResult =
+    let (_, vty1main) = vty1
+    let (_, vty2main) = vty2
+    match (vty1main, vty2main) with
+    | (VChoiceType(chid1, vtys1), VChoiceType(chid2, vtys2)) ->
+        if chid1 = chid2 then
+          auxChoice chid1 vtys1 vtys2
+        else
+          auxChoiceLeft chid1 vtys1 vty2
+
+    | (VChoiceType(chid1, vtys1), _) ->
+        auxChoiceLeft chid1 vtys1 vty2
+
+    | (VTypeVar(VUpdatable(vtvuref)), _) ->
+        failwith "TODO: unifyVariational, aux, VTypeVar; needs substitutions"
+
+    | _ ->
+        failwith "TODO: unifyVariational, aux"
+
+  and auxChoiceLeft (chid1 : ChoiceId) (vtys1 : MonoVariationalType list) (vty2 : MonoVariationalType) : MatchingResult =
+    failwith "TODO: unifyVariational, auxChoiceLeft"
+
+  and auxChoice (chid : ChoiceId) (vtys1 : MonoVariationalType list) (vtys2 : MonoVariationalType list) : MatchingResult =
+    try
+      let matacc =
+        List.fold2 (fun (matacc : Alist<MatchingResult>) vty1 vty2 ->
+          let mat = aux vty1 vty2
+          matacc.Extend(mat)
+        ) (new Alist<MatchingResult>()) vtys1 vtys2
+      in
+      let mats = matacc.ToList()
+      Partial(chid, mats)
+    with
+    | _ ->
+        Bottom
+  in
+  aux vty1 vty2
+
+
 let typecheckBaseConstant (rng : Range) (bc : BaseConstant) =
   match bc with
   | UnitValue       -> unitType rng
