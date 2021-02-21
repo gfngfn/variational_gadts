@@ -268,6 +268,28 @@ type PolyType =
   Type<PolyTypeVar>
 
 
+type MonoVariationalTypeVarUpdatable =
+  | VFree of FreeId
+  | VLink of MonoVariationalType
+
+
+and MonoVariationalTypeVar =
+  | VUpdatable of MonoVariationalTypeVarUpdatable ref
+
+
+and MonoVariationalType =
+  VariationalType<MonoVariationalTypeVar>
+
+
+type PolyVariationalTypeVar =
+  | VMono  of MonoVariationalTypeVar
+  | VBound of BoundId
+
+
+type PolyVariationalType =
+  VariationalType<PolyVariationalTypeVar>
+
+
 type ConstructorDef =
   {
     BoundIds : BoundId list;
